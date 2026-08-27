@@ -3,9 +3,9 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
-import Checkbox from '@mui/material/Checkbox';
 import List from '@mui/material/List';
-import Divider from '@mui/material/Divider';
+import Placeholder from './components/Placeholder.jsx';
+import TaskItem from './components/TaskItem.jsx';
 
 // A simple To Do application allowing users to add tasks with a title and description.
 function App() {
@@ -87,149 +87,57 @@ function App() {
         To‑Do List
       </Typography>
 
-      {/* New task entry form */}
-      <Box component="form" onSubmit={handleAddTask} sx={{ mb: 2 }}>
-        <TextField
-          id="title"
-          label="Title"
-          placeholder="Task title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          fullWidth
-          margin="normal"
-        />
-        <TextField
-          id="description"
-          label="Description (optional)"
-          placeholder="Task description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          multiline
-          rows={2}
-          fullWidth
-          margin="normal"
-        />
-        <Button type="submit" variant="contained" sx={{ mt: 1 }}>
-          Add Task
-        </Button>
+       {/* New task entry form */}
+       <Box component="form" onSubmit={handleAddTask} sx={{ mb: 2 }}>
+          <TextField
+            id="title"
+            label="Title"
+            placeholder="Task title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            id="description"
+            label="Description"
+            placeholder="Task description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
+          <Button type="submit" variant="contained" sx={{ mt: 1 }}
+            >Add Task</Button>
+       </Box>
+
+       {/* Placeholder when no tasks exist */}
+       {tasks.length === 0 && <Placeholder />}
+
+       {/* List of tasks */}
+       {tasks.length > 0 && (
+         <List component="ul" disablePadding>
+           {tasks.map((task, idx) => (
+             <TaskItem
+               key={idx}
+               task={task}
+               idx={idx}
+               toggleDone={toggleDone}
+               toggleSubtaskDone={toggleSubtaskDone}
+               subtaskParentIdx={subtaskParentIdx}
+               setSubtaskParentIdx={setSubtaskParentIdx}
+               subtaskTitle={subtaskTitle}
+               setSubtaskTitle={setSubtaskTitle}
+               subtaskDescription={subtaskDescription}
+               setSubtaskDescription={setSubtaskDescription}
+               handleAddSubtask={handleAddSubtask}
+             />
+           ))}
+         </List>
+        )}
       </Box>
-      {/* Placeholder when no tasks exist */}
-      {tasks.length === 0 && (
-        <Typography component="p" sx={{ mt: 2, textAlign: 'center', color: 'text.secondary' }}>
-          No tasks yet. Add one above!
-        </Typography>
-      )}
-
-      {/* List of tasks */}
-      {tasks.length > 0 && (
-        <List component="ul" disablePadding>
-          {tasks.map((task, idx) => {
-            const titleId = `task-title-${idx}`;
-            const descId = `task-desc-${idx}`;
-            const checkboxId = `task-done-${idx}`;
-            return (
-              <Box
-                key={idx}
-                component="li"
-                aria-labelledby={titleId}
-                aria-describedby={task.description ? descId : undefined}
-                sx={{ mb: 2, border: "1px solid #ddd", borderRadius: 1, p: 2 }}>
-                <Box display="flex" alignItems="center">
-                  <Checkbox
-                    id={checkboxId}
-                    checked={task.done}
-                    onChange={() => toggleDone(idx)}
-                    inputProps={{ 'aria-label': 'task done' }}
-                  />
-                  <Typography
-                    id={titleId}
-                    component="span"
-                    variant="h6"
-                    sx={{ textDecoration: task.done ? 'line-through' : 'none' }}>
-                    {task.title}
-                  </Typography>
-                </Box>
-                {task.description && (
-                  <Typography
-                    id={descId}
-                    variant="body2"
-                    sx={{ ml: 4, textDecoration: task.done ? 'line-through' : 'none' }}>
-                    {task.description}
-                  </Typography>
-                )}
-                {/* Subtasks */}
-                {task.subtasks && task.subtasks.length > 0 && (
-                  <List component="ul" disablePadding sx={{ pl: 2, mt: 1 }}>
-                    {task.subtasks.map((sub, sIdx) => {
-                      const subTitleId = `sub-title-${idx}-${sIdx}`;
-                      const subDescId = `sub-desc-${idx}-${sIdx}`;
-                      const subCheckboxId = `sub-done-${idx}-${sIdx}`;
-                      return (
-                        <Box key={sIdx} component="li" aria-labelledby={subTitleId} aria-describedby={sub.description ? subDescId : undefined} sx={{ mb: 1 }}>
-                          <Box display="flex" alignItems="center">
-                            <Checkbox
-                              id={subCheckboxId}
-                              checked={sub.done}
-                              onChange={() => toggleSubtaskDone(idx, sIdx)}
-                              inputProps={{ 'aria-label': 'subtask done' }}
-                            />
-                            <Typography id={subTitleId} component="span" variant="body1" sx={{ textDecoration: sub.done ? 'line-through' : 'none' }}>
-                              {sub.title}
-                            </Typography>
-                          </Box>
-                          {sub.description && (
-                            <Typography id={subDescId} variant="body2" sx={{ ml: 4, textDecoration: sub.done ? 'line-through' : 'none' }}>
-                              {sub.description}
-                            </Typography>
-                          )}
-                        </Box>
-                      );
-                    })}
-                  </List>
-                )}
-
-                {/* Button to add a subtask */}
-                <Button type="button" onClick={() => setSubtaskParentIdx(idx)} sx={{ mt: 1 }}>
-                  Add Subtask
-                </Button>
-                {/* Subtask entry form (shown only for the selected parent) */}
-                {subtaskParentIdx === idx && (
-                  <Box component="form" onSubmit={handleAddSubtask} sx={{ mt: 1 }}>
-                    <TextField
-                      id="subtask-title"
-                      label="Subtask Title"
-                      placeholder="Subtask title"
-                      value={subtaskTitle}
-                      onChange={(e) => setSubtaskTitle(e.target.value)}
-                      required
-                      fullWidth
-                      margin="normal"
-                    />
-                    <TextField
-                      id="subtask-desc"
-                      label="Subtask Description (optional)"
-                      placeholder="Subtask description"
-                      value={subtaskDescription}
-                      onChange={(e) => setSubtaskDescription(e.target.value)}
-                      multiline
-                      rows={2}
-                      fullWidth
-                      margin="normal"
-                    />
-                    <Button type="submit" variant="contained" sx={{ mt: 1 }}>
-                      Add Subtask
-                    </Button>
-                  </Box>
-                )}
-                <Divider sx={{ my: 2 }} />
-              </Box>
-            );
-          })}
-        </List>
-      )}
-    </Box>
-  );
+    );
 }
 
 export default App;

@@ -18,6 +18,8 @@ function App() {
   // Controlled input state for new task
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  // Tracks the id of the most recently added subtask so we can move focus to it
+  const [focusTarget, setFocusTarget] = useState(null);
 
   // Handle adding a new top‑level task
   const handleAddTask = (e) => {
@@ -76,11 +78,8 @@ function App() {
     setSubtaskTitle('');
     setSubtaskDescription('');
     setSubtaskParentId(null);
-    // After state updates, move focus to the newly added subtask checkbox so the user knows it was added
-    setTimeout(() => {
-      const checkbox = document.getElementById(`sub-done-${newSubId}`);
-      checkbox?.focus();
-    }, 0);
+    // Ask the focus effect (below) to move focus to the newly added subtask checkbox
+    setFocusTarget(newSubId);
   };
 
   // Simple storage shim: use the real localStorage when available, otherwise a no‑op shim.
@@ -112,6 +111,14 @@ function App() {
   useEffect(() => {
     storage.setItem('tasks', JSON.stringify(tasks));
   }, [tasks]);
+
+  // When a subtask is added, move focus to its checkbox once it has been rendered
+  useEffect(() => {
+    if (focusTarget === null) return;
+    const checkbox = document.getElementById(`sub-done-${focusTarget}`);
+    checkbox?.focus();
+    setFocusTarget(null);
+  }, [focusTarget]);
 
   return (
     <Box component="section" sx={{ p: 2, maxWidth: 600, mx: "auto" }}>

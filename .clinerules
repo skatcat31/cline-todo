@@ -1,0 +1,4 @@
+- NEVER use top-level barrel imports for MUI components (e.g., import { Box, Button } from '@mui/material').
+- ALWAYS use direct path imports to keep compilation times low:
+  import Box from '@mui/material/Box';
+  import Button from '@mui/material/Button';

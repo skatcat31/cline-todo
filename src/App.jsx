@@ -1,4 +1,11 @@
 import React, { useState } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import List from '@mui/material/List';
+import Divider from '@mui/material/Divider';
 
 // A simple To Do application allowing users to add tasks with a title and description.
 function App() {
@@ -8,13 +15,13 @@ function App() {
   const [subtaskParentIdx, setSubtaskParentIdx] = useState(null);
   const [subtaskTitle, setSubtaskTitle] = useState('');
   const [subtaskDescription, setSubtaskDescription] = useState('');
-  // Ref is no longer needed for persistent focus; we'll focus the newly added subtask checkbox instead
-  // Controlled input state
+  // Controlled input state for new task
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+
+  // Handle adding a new top‑level task
   const handleAddTask = (e) => {
     e.preventDefault();
-    // Basic validation: require a title
     if (!title.trim()) return;
     const newTask = {
       title: title.trim(),
@@ -57,7 +64,6 @@ function App() {
       description: subtaskDescription.trim(),
       done: false,
     };
-    // Determine the index the new subtask will have (current length before addition)
     const newIdx = tasks[subtaskParentIdx]?.subtasks?.length ?? 0;
     setTasks((prev) =>
       prev.map((t, i) => {
@@ -65,7 +71,6 @@ function App() {
         return { ...t, subtasks: [...t.subtasks, newSub] };
       })
     );
-    // Reset subtask form state and close the form
     setSubtaskTitle('');
     setSubtaskDescription('');
     setSubtaskParentIdx(null);
@@ -77,152 +82,153 @@ function App() {
   };
 
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif', padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
-      <h1 style={{ textAlign: 'center' }}>To‑Do List</h1>
-      {/* Input form with accessible labels */}
-      <form onSubmit={handleAddTask} style={{ marginBottom: '2rem' }}>
-        <div style={{ marginBottom: '0.5rem' }}>
-          <label htmlFor="title-input" style={{ display: 'block', marginBottom: '0.25rem' }}>
-            Title
-          </label>
-          <input
-            id="title-input"
-            type="text"
-            placeholder="Task title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
-            required
-          />
-        </div>
-        <div style={{ marginBottom: '0.5rem' }}>
-          <label htmlFor="desc-input" style={{ display: 'block', marginBottom: '0.25rem' }}>
-            Description (optional)
-          </label>
-          <textarea
-            id="desc-input"
-            placeholder="Task description (optional)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
-            rows={3}
-          />
-        </div>
-        <button type="submit" style={{ padding: '0.5rem 1rem', fontSize: '1rem' }}>
-          Add Task
-        </button>
-      </form>
+    <Box component="section" sx={{ p: 2, maxWidth: 600, mx: "auto" }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        To‑Do List
+      </Typography>
 
-      {/* Task list */}
-      {tasks.length === 0 ? (
-        <p>No tasks yet. Add one above!</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+      {/* New task entry form */}
+      <Box component="form" onSubmit={handleAddTask} sx={{ mb: 2 }}>
+        <TextField
+          id="title"
+          label="Title"
+          placeholder="Task title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+          fullWidth
+          margin="normal"
+        />
+        <TextField
+          id="description"
+          label="Description (optional)"
+          placeholder="Task description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          multiline
+          rows={2}
+          fullWidth
+          margin="normal"
+        />
+        <Button type="submit" variant="contained" sx={{ mt: 1 }}>
+          Add Task
+        </Button>
+      </Box>
+      {/* Placeholder when no tasks exist */}
+      {tasks.length === 0 && (
+        <Typography component="p" sx={{ mt: 2, textAlign: 'center', color: 'text.secondary' }}>
+          No tasks yet. Add one above!
+        </Typography>
+      )}
+
+      {/* List of tasks */}
+      {tasks.length > 0 && (
+        <List component="ul" disablePadding>
           {tasks.map((task, idx) => {
             const titleId = `task-title-${idx}`;
             const descId = `task-desc-${idx}`;
             const checkboxId = `task-done-${idx}`;
             return (
-              <li
+              <Box
                 key={idx}
+                component="li"
                 aria-labelledby={titleId}
                 aria-describedby={task.description ? descId : undefined}
-                style={{
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  padding: '0.75rem',
-                  marginBottom: '0.75rem',
-                  backgroundColor: '#f9f9f9',
-                }}
-              >
-                {/* Checkbox to mark task as done */}
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <input
-                    type="checkbox"
+                sx={{ mb: 2, border: "1px solid #ddd", borderRadius: 1, p: 2 }}>
+                <Box display="flex" alignItems="center">
+                  <Checkbox
                     id={checkboxId}
                     checked={task.done}
                     onChange={() => toggleDone(idx)}
-                    aria-label="task done"
+                    inputProps={{ 'aria-label': 'task done' }}
                   />
-                  <label htmlFor={checkboxId} style={{ marginLeft: '0.5rem' }}>
-                    Done
-                  </label>
-                </div>
-                <strong id={titleId} style={{ textDecoration: task.done ? 'line-through' : 'none' }}>{task.title}</strong>
+                  <Typography
+                    id={titleId}
+                    component="span"
+                    variant="h6"
+                    sx={{ textDecoration: task.done ? 'line-through' : 'none' }}>
+                    {task.title}
+                  </Typography>
+                </Box>
                 {task.description && (
-                  <p id={descId} style={{ margin: '0.25rem 0 0', textDecoration: task.done ? 'line-through' : 'none' }}>{task.description}</p>
+                  <Typography
+                    id={descId}
+                    variant="body2"
+                    sx={{ ml: 4, textDecoration: task.done ? 'line-through' : 'none' }}>
+                    {task.description}
+                  </Typography>
                 )}
-
-                {/* Subtasks list */}
+                {/* Subtasks */}
                 {task.subtasks && task.subtasks.length > 0 && (
-                  <ul style={{ listStyle: 'none', paddingLeft: '1rem', marginTop: '0.5rem' }}>
+                  <List component="ul" disablePadding sx={{ pl: 2, mt: 1 }}>
                     {task.subtasks.map((sub, sIdx) => {
                       const subTitleId = `sub-title-${idx}-${sIdx}`;
                       const subDescId = `sub-desc-${idx}-${sIdx}`;
                       const subCheckboxId = `sub-done-${idx}-${sIdx}`;
                       return (
-                        <li key={sIdx} aria-labelledby={subTitleId} aria-describedby={sub.description ? subDescId : undefined} style={{ marginBottom: '0.4rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center' }}>
-                            <input
-                              type="checkbox"
+                        <Box key={sIdx} component="li" aria-labelledby={subTitleId} aria-describedby={sub.description ? subDescId : undefined} sx={{ mb: 1 }}>
+                          <Box display="flex" alignItems="center">
+                            <Checkbox
                               id={subCheckboxId}
                               checked={sub.done}
                               onChange={() => toggleSubtaskDone(idx, sIdx)}
-                              aria-label="subtask done"
+                              inputProps={{ 'aria-label': 'subtask done' }}
                             />
-                            <label htmlFor={subCheckboxId} style={{ marginLeft: '0.4rem' }}>
-                              <strong id={subTitleId} style={{ textDecoration: sub.done ? 'line-through' : 'none' }}>{sub.title}</strong>
-                            </label>
-                          </div>
+                            <Typography id={subTitleId} component="span" variant="body1" sx={{ textDecoration: sub.done ? 'line-through' : 'none' }}>
+                              {sub.title}
+                            </Typography>
+                          </Box>
                           {sub.description && (
-                            <p id={subDescId} style={{ margin: '0.2rem 0 0 1.6rem', textDecoration: sub.done ? 'line-through' : 'none' }}>{sub.description}</p>
+                            <Typography id={subDescId} variant="body2" sx={{ ml: 4, textDecoration: sub.done ? 'line-through' : 'none' }}>
+                              {sub.description}
+                            </Typography>
                           )}
-                        </li>
+                        </Box>
                       );
                     })}
-                  </ul>
+                  </List>
                 )}
 
                 {/* Button to add a subtask */}
-                <button type="button" onClick={() => setSubtaskParentIdx(idx)} style={{ marginTop: '0.5rem' }}>
+                <Button type="button" onClick={() => setSubtaskParentIdx(idx)} sx={{ mt: 1 }}>
                   Add Subtask
-                </button>
-
+                </Button>
                 {/* Subtask entry form (shown only for the selected parent) */}
                 {subtaskParentIdx === idx && (
-                  <form onSubmit={handleAddSubtask} style={{ marginTop: '0.5rem' }}>
-                    <div style={{ marginBottom: '0.25rem' }}>
-                      <label htmlFor="subtask-title" style={{ display: 'block', marginBottom: '0.1rem' }}>Subtask Title</label>
-                      <input
-                        id="subtask-title"
-                        type="text"
-                        placeholder="Subtask title"
-                        value={subtaskTitle}
-                        onChange={(e) => setSubtaskTitle(e.target.value)}
-                        required
-                         style={{ width: '100%', padding: '0.4rem' }}
-                      />
-                    </div>
-                    <div style={{ marginBottom: '0.25rem' }}>
-                      <label htmlFor="subtask-desc" style={{ display: 'block', marginBottom: '0.1rem' }}>Subtask Description (optional)</label>
-                      <textarea
-                        id="subtask-desc"
-                        placeholder="Subtask description"
-                        value={subtaskDescription}
-                        onChange={(e) => setSubtaskDescription(e.target.value)}
-                        rows={2}
-                        style={{ width: '100%', padding: '0.4rem', resize: 'vertical' }}
-                      />
-                    </div>
-                    <button type="submit" style={{ padding: '0.3rem 0.6rem' }}>Add Subtask</button>
-                  </form>
+                  <Box component="form" onSubmit={handleAddSubtask} sx={{ mt: 1 }}>
+                    <TextField
+                      id="subtask-title"
+                      label="Subtask Title"
+                      placeholder="Subtask title"
+                      value={subtaskTitle}
+                      onChange={(e) => setSubtaskTitle(e.target.value)}
+                      required
+                      fullWidth
+                      margin="normal"
+                    />
+                    <TextField
+                      id="subtask-desc"
+                      label="Subtask Description (optional)"
+                      placeholder="Subtask description"
+                      value={subtaskDescription}
+                      onChange={(e) => setSubtaskDescription(e.target.value)}
+                      multiline
+                      rows={2}
+                      fullWidth
+                      margin="normal"
+                    />
+                    <Button type="submit" variant="contained" sx={{ mt: 1 }}>
+                      Add Subtask
+                    </Button>
+                  </Box>
                 )}
-              </li>
+                <Divider sx={{ my: 2 }} />
+              </Box>
             );
           })}
-        </ul>
+        </List>
       )}
-    </div>
+    </Box>
   );
 }
 

@@ -15,4 +15,16 @@ export default defineConfig({
     // Optional: increase timeout for async UI interactions
     timeout: 5000,
   },
+  // Vitest coverage configuration – enforce minimum 80% coverage for all metrics
+  // This ensures CI pipelines will fail if coverage drops below the required threshold.
+  coverage: {
+    reporter: ['text', 'html'],
+    // Enforce thresholds (percentage) – adjust as needed per project policy.
+    thresholds: {
+      statements: 80,
+      branches: 80,
+      functions: 80,
+      lines: 80,
+    },
+  },
 });

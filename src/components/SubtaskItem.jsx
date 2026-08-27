@@ -6,15 +6,13 @@ import Typography from '@mui/material/Typography';
 /**
  * Renders a single subtask with a checkbox and optional description.
  * Props:
- *   sub - the subtask object {title, description, done}
- *   parentIdx - index of the parent task (used for generating stable ids)
- *   subIdx - index of this subtask within its parent
+ *   sub - the subtask object {id, title, description, done}
  *   onToggle - callback invoked when the checkbox is toggled
  */
-export default function SubtaskItem({ sub, parentIdx, subIdx, onToggle }) {
-  const subTitleId = `sub-title-${parentIdx}-${subIdx}`;
-  const subDescId = `sub-desc-${parentIdx}-${subIdx}`;
-  const subCheckboxId = `sub-done-${parentIdx}-${subIdx}`;
+export default function SubtaskItem({ sub, onToggle }) {
+  const subTitleId = `sub-title-${sub.id}`;
+  const subDescId = `sub-desc-${sub.id}`;
+  const subCheckboxId = `sub-done-${sub.id}`;
 
   return (
     <Box

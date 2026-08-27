@@ -139,7 +139,7 @@ test('add task with empty title does not create a task', async () => {
 
 /**
  * Verify that attempting to add a sub‑task without first selecting a parent
- * (i.e., `subtaskParentIdx` is null) does nothing. The form should not be
+ * (i.e., `subtaskParentId` is null) does nothing. The form should not be
  * rendered and no sub‑task should be added.
  */
 test('add subtask without selecting parent does nothing', async () => {
@@ -213,7 +213,7 @@ test('add task without description does not render description element', async (
 
 /**
  * Adding a sub‑task to the second of multiple tasks ensures the `map` loop in
- * `handleAddSubtask` executes the false branch (`i !== subtaskParentIdx`).
+ * `handleAddSubtask` executes the false branch (`t.id !== subtaskParentId`).
  */
 test('add subtask to second task exercises map false branch', async () => {
   render(<App />);
@@ -251,7 +251,7 @@ test('add subtask to second task exercises map false branch', async () => {
 
 /**
  * Toggle the done state of the first sub‑task when multiple sub‑tasks exist.
- * This covers the false branch of the `si === subIdx` conditional inside
+ * This covers the false branch of the `s.id === subId` conditional inside
  * `toggleSubtaskDone`.
  */
 test('toggle first subtask when multiple subtasks exist', async () => {
@@ -329,7 +329,7 @@ test('toggle task with multiple tasks exercises map false branch', async () => {
 
 /**
  * Toggle a sub‑task when multiple parent tasks exist to cover the false branch
- * of the `i !== parentIdx` check inside `toggleSubtaskDone`.
+ * of the `t.id !== parentId` check inside `toggleSubtaskDone`.
  */
 test('toggle subtask with multiple parent tasks exercises false branch', async () => {
   render(<App />);

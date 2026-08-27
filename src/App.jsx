@@ -57,6 +57,22 @@ function App() {
     );
   };
 
+  // Delete a top‑level task by its id
+  const deleteTask = (id) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Delete a subtask (given parent and subtask ids) from its parent task
+  const deleteSubtask = (parentId, subId) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === parentId
+          ? { ...t, subtasks: t.subtasks.filter((s) => s.id !== subId) }
+          : t
+      )
+    );
+  };
+
   // Handle adding a subtask to the currently selected parent
   const handleAddSubtask = (e) => {
     e.preventDefault();
@@ -150,7 +166,9 @@ function App() {
                key={task.id}
                task={task}
                toggleDone={toggleDone}
+               deleteTask={deleteTask}
                toggleSubtaskDone={toggleSubtaskDone}
+               deleteSubtask={deleteSubtask}
                subtaskParentId={subtaskParentId}
                setSubtaskParentId={setSubtaskParentId}
                subtaskTitle={subtaskTitle}

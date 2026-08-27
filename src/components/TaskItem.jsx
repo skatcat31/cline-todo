@@ -13,7 +13,9 @@ import SubtaskItem from './SubtaskItem.jsx';
  * Props:
  *   task - the task object {id, title, description, done, subtasks}
  *   toggleDone - handler to toggle task done state (receives the task id)
+ *   deleteTask - handler to delete the task (receives the task id)
  *   toggleSubtaskDone - handler to toggle a subtask done state (receives parent and subtask ids)
+ *   deleteSubtask - handler to delete a subtask (receives parent and subtask ids)
  *   subtaskParentId - currently selected parent id for adding a subtask
  *   setSubtaskParentId - setter to open the subtask form for a specific task
  *   subtaskTitle, setSubtaskTitle, subtaskDescription, setSubtaskDescription
@@ -22,7 +24,9 @@ import SubtaskItem from './SubtaskItem.jsx';
 export default function TaskItem({
   task,
   toggleDone,
+  deleteTask,
   toggleSubtaskDone,
+  deleteSubtask,
   subtaskParentId,
   setSubtaskParentId,
   subtaskTitle,
@@ -66,13 +70,17 @@ export default function TaskItem({
               key={sub.id}
               sub={sub}
               onToggle={() => toggleSubtaskDone(task.id, sub.id)}
+              onDelete={() => deleteSubtask(task.id, sub.id)}
             />
           ))}
         </List>
       )}
-      {/* Button to add a subtask */}
+      {/* Buttons to add a subtask or delete this task */}
       <Button type="button" onClick={() => setSubtaskParentId(task.id)} sx={{ mt: 1 }}>
         Add Subtask
+      </Button>
+      <Button type="button" color="error" onClick={() => deleteTask(task.id)} sx={{ mt: 1 }}>
+        Delete Task
       </Button>
       {/* Subtask entry form (shown only for the selected parent) */}
       {subtaskParentId === task.id && (

@@ -1,5 +1,6 @@
 import React from 'react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Typography from '@mui/material/Typography';
 
@@ -8,8 +9,9 @@ import Typography from '@mui/material/Typography';
  * Props:
  *   sub - the subtask object {id, title, description, done}
  *   onToggle - callback invoked when the checkbox is toggled
+ *   onDelete - callback invoked when the delete button is clicked
  */
-export default function SubtaskItem({ sub, onToggle }) {
+export default function SubtaskItem({ sub, onToggle, onDelete }) {
   const subTitleId = `sub-title-${sub.id}`;
   const subDescId = `sub-desc-${sub.id}`;
   const subCheckboxId = `sub-done-${sub.id}`;
@@ -36,6 +38,9 @@ export default function SubtaskItem({ sub, onToggle }) {
         >
           {sub.title}
         </Typography>
+        <Button type="button" size="small" color="error" onClick={onDelete}>
+          Delete Subtask
+        </Button>
       </Box>
       {sub.description && (
         <Typography

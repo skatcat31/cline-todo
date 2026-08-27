@@ -399,3 +399,103 @@ test('add subtask without description does not render description element', asyn
   const subTaskItem = screen.getByText('NoDesc Sub').closest('li');
   expect(within(subTaskItem).queryByRole('paragraph')).not.toBeInTheDocument();
 });
+
+/**
+ * Deleting a task removes it from the list while leaving other tasks intact.
+ */
+test('deleting a task removes it from the list', async () => {
+  render(<App />);
+
+  const titleInput = screen.getByLabelText(/title/i);
+  const descInput = screen.getByLabelText(/description/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+
+  // Add two tasks
+  await userEvent.type(titleInput, 'Task 1');
+  await userEvent.type(descInput, 'Desc 1');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task 2');
+  await userEvent.type(descInput, 'Desc 2');
+  await userEvent.click(addTaskBtn);
+
+  expect(screen.getByText('Task 1')).toBeInTheDocument();
+  expect(screen.getByText('Task 2')).toBeInTheDocument();
+
+  // Delete the first task
+  const deleteTaskBtns = screen.getAllByRole('button', { name: /delete task/i });
+  await userEvent.click(deleteTaskBtns[0]);
+
+  expect(screen.queryByText('Task 1')).not.toBeInTheDocument();
+  expect(screen.getByText('Task 2')).toBeInTheDocument();
+});
+
+/**
+ * Deleting a subtask removes it from its parent task while leaving the parent
+ * and sibling subtasks intact.
+ */
+test('deleting a subtask removes it from its parent task', async () => {
+  render(<App />);
+
+  const titleInput = screen.getByLabelText(/title/i);
+  const descInput = screen.getByLabelText(/description/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+
+  // Add a parent task
+  await userEvent.type(titleInput, 'Parent Task');
+  await userEvent.type(descInput, 'Parent Desc');
+  await userEvent.click(addTaskBtn);
+
+  // Add two subtasks to the parent
+  const [openSubBtn] = screen.getAllByRole('button', { name: /add subtask/i });
+  await userEvent.click(openSubBtn);
+  let subTitleInput = screen.getByLabelText(/subtask title/i);
+  let subDescInput = screen.getByLabelText(/subtask description/i);
+  let form = subTitleInput.closest('form');
+  let submitBtn = within(form).getByRole('button', { name: /add subtask$/i });
+  await userEvent.type(subTitleInput, 'Sub 1');
+  await userEvent.type(subDescInput, 'Sub 1 Desc');
+  await userEvent.click(submitBtn);
+
+  await userEvent.click(openSubBtn);
+  subTitleInput = screen.getByLabelText(/subtask title/i);
+  subDescInput = screen.getByLabelText(/subtask description/i);
+  form = subTitleInput.closest('form');
+  submitBtn = within(form).getByRole('button', { name: /add subtask$/i });
+  await userEvent.type(subTitleInput, 'Sub 2');
+  await userEvent.type(subDescInput, 'Sub 2 Desc');
+  await userEvent.click(submitBtn);
+
+  expect(screen.getByText('Sub 1')).toBeInTheDocument();
+  expect(screen.getByText('Sub 2')).toBeInTheDocument();
+
+  // Delete the first subtask
+  const deleteSubBtns = screen.getAllByRole('button', { name: /delete subtask/i });
+  await userEvent.click(deleteSubBtns[0]);
+
+  expect(screen.queryByText('Sub 1')).not.toBeInTheDocument();
+  expect(screen.getByText('Sub 2')).toBeInTheDocument();
+  // The parent task must remain
+  expect(screen.getByText('Parent Task')).toBeInTheDocument();
+});
+
+/**
+ * Deleting the last remaining task brings back the empty-state placeholder.
+ */
+test('deleting the last task shows the empty placeholder', async () => {
+  render(<App />);
+
+  const titleInput = screen.getByLabelText(/title/i);
+  const descInput = screen.getByLabelText(/description/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+
+  await userEvent.type(titleInput, 'Only Task');
+  await userEvent.type(descInput, 'Only Desc');
+  await userEvent.click(addTaskBtn);
+  expect(screen.getByText('Only Task')).toBeInTheDocument();
+
+  const [deleteTaskBtn] = screen.getAllByRole('button', { name: /delete task/i });
+  await userEvent.click(deleteTaskBtn);
+
+  expect(screen.queryByText('Only Task')).not.toBeInTheDocument();
+  expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument();
+});

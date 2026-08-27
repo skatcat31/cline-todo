@@ -26,7 +26,7 @@ export default function SubtaskItem({ sub, onToggle }) {
           id={subCheckboxId}
           checked={sub.done}
           onChange={onToggle}
-          inputProps={{ 'aria-label': 'subtask done' }}
+          inputProps={{ 'aria-labelledby': subTitleId }}
         />
         <Typography
           id={subTitleId}

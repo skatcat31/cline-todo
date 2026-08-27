@@ -60,7 +60,7 @@ test('full task & subtask flow works correctly', async () => {
   expect(screen.queryByLabelText(/subtask title/i)).not.toBeInTheDocument();
 
   // Focus should be on the newly added checkbox (aria-label "subtask done")
-  const newCheckbox = await screen.findByLabelText('subtask done');
+  const newCheckbox = await screen.findByRole('checkbox', { name: 'Subtask A' });
   await waitFor(() => {
     expect(newCheckbox).toHaveFocus();
   });
@@ -87,7 +87,7 @@ test('toggle task and subtask done works correctly', async () => {
   expect(screen.getByText('Task 2')).toBeInTheDocument();
 
   // ---- Toggle task done -------------------------------------------------
-  const taskCheckbox = screen.getByLabelText('task done');
+  const taskCheckbox = screen.getByRole('checkbox', { name: 'Task 2' });
   await userEvent.click(taskCheckbox);
   expect(taskCheckbox).toBeChecked();
   // The task title should now have a line‑through style
@@ -111,7 +111,7 @@ test('toggle task and subtask done works correctly', async () => {
   expect(screen.getByText('Subtask B')).toBeInTheDocument();
 
   // ---- Toggle sub‑task done --------------------------------------------
-  const subCheckbox = screen.getByLabelText('subtask done');
+  const subCheckbox = screen.getByRole('checkbox', { name: 'Subtask B' });
   await userEvent.click(subCheckbox);
   expect(subCheckbox).toBeChecked();
   const subTitle = screen.getByText('Subtask B');
@@ -179,7 +179,7 @@ test('add subtask with empty title does not create subtask', async () => {
   await userEvent.click(submitBtn);
 
   // No sub‑task should appear – there should be no subtask checkboxes.
-  expect(screen.queryAllByLabelText('subtask done')).toHaveLength(0);
+  expect(screen.getAllByRole('checkbox')).toHaveLength(1);
 });
 
 /**
@@ -290,11 +290,11 @@ test('toggle first subtask when multiple subtasks exist', async () => {
   await userEvent.click(submitBtn2);
 
   // Toggle the first sub‑task
-  const firstCheckbox = screen.getAllByLabelText('subtask done')[0];
+  const firstCheckbox = screen.getByRole('checkbox', { name: 'First Sub' });
   await userEvent.click(firstCheckbox);
   expect(firstCheckbox).toBeChecked();
   // Ensure the second sub‑task remains unchecked
-  const secondCheckbox = screen.getAllByLabelText('subtask done')[1];
+  const secondCheckbox = screen.getByRole('checkbox', { name: 'Second Sub' });
   expect(secondCheckbox).not.toBeChecked();
 });
 
@@ -320,11 +320,11 @@ test('toggle task with multiple tasks exercises map false branch', async () => {
   await userEvent.click(addTaskBtn);
 
   // Toggle the first task's checkbox
-  const checkboxes = screen.getAllByLabelText('task done');
-  await userEvent.click(checkboxes[0]);
-  expect(checkboxes[0]).toBeChecked();
+  const firstCheckbox = screen.getByRole('checkbox', { name: 'Task 1' });
+  await userEvent.click(firstCheckbox);
+  expect(firstCheckbox).toBeChecked();
   // Ensure the second task remains unchecked
-  expect(checkboxes[1]).not.toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'Task 2' })).not.toBeChecked();
 });
 
 /**
@@ -358,11 +358,11 @@ test('toggle subtask with multiple parent tasks exercises false branch', async (
   await userEvent.click(submitBtn);
 
   // Toggle the sub‑task of the first parent
-  const subCheckboxes = screen.getAllByLabelText('subtask done');
-  await userEvent.click(subCheckboxes[0]);
-  expect(subCheckboxes[0]).toBeChecked();
-  // No other sub‑task checkboxes should exist (ensuring false branch exercised)
-  expect(subCheckboxes).toHaveLength(1);
+  const subCheckbox = screen.getByRole('checkbox', { name: 'Sub A' });
+  await userEvent.click(subCheckbox);
+  expect(subCheckbox).toBeChecked();
+  // The subtask should exist under exactly one parent (false branch exercised)
+  expect(screen.getAllByText('Sub A')).toHaveLength(1);
 });
 
 /**

@@ -38,7 +38,7 @@ export default function TaskItem({
           id={`done-${task.id}`}
           checked={task.done}
           onChange={() => toggleDone(task.id)}
-          inputProps={{ 'aria-label': 'task done' }}
+          inputProps={{ 'aria-labelledby': `task-title-${task.id}` }}
         />
         <Typography
           id={`task-title-${task.id}`}

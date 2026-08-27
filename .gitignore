@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.DS_Store
+npm-debug.log
+# Vite configuration files are part of the source and should be versioned.
+# Previously this line ignored them, which prevented the Vite config from being
+# tracked and caused CI builds to miss required settings.

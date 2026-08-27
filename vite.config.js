@@ -12,6 +12,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Global test setup: localStorage polyfill + per-test isolation
+    setupFiles: ['./src/test/setup.js'],
     // Optional: increase timeout for async UI interactions
     timeout: 5000,
   },

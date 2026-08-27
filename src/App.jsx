@@ -82,21 +82,9 @@ function App() {
     setFocusTarget(newSubId);
   };
 
-  // Simple storage shim: use the real localStorage when available, otherwise a no‑op shim.
-  // This eliminates conditional branches to improve test coverage.
-  // Use a ternary to safely obtain localStorage when it exists, otherwise fallback to a no‑op shim.
-  // This avoids ReferenceError in environments where localStorage is undefined.
-  // eslint-disable-next-line no-undef
-  const storage = typeof localStorage !== 'undefined'
-    ? localStorage
-    : {
-        getItem: () => null,
-        setItem: () => {},
-      };
-
   // Load tasks from storage on component mount
   useEffect(() => {
-    const stored = storage.getItem('tasks');
+    const stored = localStorage.getItem('tasks');
     if (stored) {
       try {
         // Assume stored data is a valid tasks array.
@@ -109,7 +97,7 @@ function App() {
 
   // Persist tasks to storage whenever they change
   useEffect(() => {
-    storage.setItem('tasks', JSON.stringify(tasks));
+    localStorage.setItem('tasks', JSON.stringify(tasks));
   }, [tasks]);
 
   // When a subtask is added, move focus to its checkbox once it has been rendered

@@ -73,6 +73,32 @@ function App() {
     );
   };
 
+  // Update a top‑level task's title and description by its id
+  const editTask = (id, { title, description }) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, title: title.trim(), description: description.trim() }
+          : t
+      )
+    );
+  };
+
+  // Update a subtask's title and description given parent and subtask ids
+  const editSubtask = (parentId, subId, { title, description }) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== parentId) return t;
+        const newSubs = t.subtasks.map((s) =>
+          s.id === subId
+            ? { ...s, title: title.trim(), description: description.trim() }
+            : s
+        );
+        return { ...t, subtasks: newSubs };
+      })
+    );
+  };
+
   // Handle adding a subtask to the currently selected parent
   const handleAddSubtask = (e) => {
     e.preventDefault();
@@ -167,8 +193,10 @@ function App() {
                task={task}
                toggleDone={toggleDone}
                deleteTask={deleteTask}
+               editTask={editTask}
                toggleSubtaskDone={toggleSubtaskDone}
                deleteSubtask={deleteSubtask}
+               editSubtask={editSubtask}
                subtaskParentId={subtaskParentId}
                setSubtaskParentId={setSubtaskParentId}
                subtaskTitle={subtaskTitle}

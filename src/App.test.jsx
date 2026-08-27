@@ -499,3 +499,103 @@ test('deleting the last task shows the empty placeholder', async () => {
   expect(screen.queryByText('Only Task')).not.toBeInTheDocument();
   expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument();
 });
+
+/**
+ * Editing a task's title and description replaces the displayed values and
+ * closes the inline edit form.
+ */
+test('editing a task updates its title and description', async () => {
+  render(<App />);
+
+  // ---- Add a task -------------------------------------------------------
+  const titleInput = screen.getByLabelText(/^title/i);
+  const descInput = screen.getByLabelText(/^description/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+
+  await userEvent.type(titleInput, 'Task 1');
+  await userEvent.type(descInput, 'Task description');
+  await userEvent.click(addTaskBtn);
+
+  expect(screen.getByText('Task 1')).toBeInTheDocument();
+  expect(screen.getByText('Task description')).toBeInTheDocument();
+
+  // ---- Open the inline edit form ----------------------------------------
+  const [editTaskBtn] = screen.getAllByRole('button', { name: /edit task/i });
+  await userEvent.click(editTaskBtn);
+
+  const editTitleInput = screen.getByLabelText(/^edit title/i);
+  const editDescInput = screen.getByLabelText(/^edit description/i);
+
+  // Update the pre-filled values
+  await userEvent.clear(editTitleInput);
+  await userEvent.type(editTitleInput, 'Task 1 (edited)');
+  await userEvent.clear(editDescInput);
+  await userEvent.type(editDescInput, 'Updated description');
+
+  // Save the changes
+  const editForm = editTitleInput.closest('form');
+  const saveTaskBtn = within(editForm).getByRole('button', { name: 'Save Task' });
+  await userEvent.click(saveTaskBtn);
+
+  // New values are shown and the edit form is closed
+  expect(screen.getByText('Task 1 (edited)')).toBeInTheDocument();
+  expect(screen.getByText('Updated description')).toBeInTheDocument();
+  expect(screen.queryByLabelText(/^edit title/i)).not.toBeInTheDocument();
+});
+
+/**
+ * Editing a subtask's title and description replaces the displayed values and
+ * closes the inline edit form, while leaving the parent task untouched.
+ */
+test('editing a subtask updates its title and description', async () => {
+  render(<App />);
+
+  // ---- Add a parent task ------------------------------------------------
+  const titleInput = screen.getByLabelText(/^title/i);
+  const descInput = screen.getByLabelText(/^description/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+
+  await userEvent.type(titleInput, 'Parent Task');
+  await userEvent.type(descInput, 'Parent Desc');
+  await userEvent.click(addTaskBtn);
+
+  // ---- Add a subtask ----------------------------------------------------
+  const [openSubBtn] = screen.getAllByRole('button', { name: /add subtask/i });
+  await userEvent.click(openSubBtn);
+
+  const subTitleInput = screen.getByLabelText(/^subtask title/i);
+  const subDescInput = screen.getByLabelText(/^subtask description/i);
+  const subForm = subTitleInput.closest('form');
+  const submitSubBtn = within(subForm).getByRole('button', { name: /add subtask$/i });
+
+  await userEvent.type(subTitleInput, 'Sub 1');
+  await userEvent.type(subDescInput, 'Sub 1 Desc');
+  await userEvent.click(submitSubBtn);
+
+  expect(screen.getByText('Sub 1')).toBeInTheDocument();
+  expect(screen.getByText('Sub 1 Desc')).toBeInTheDocument();
+
+  // ---- Open the inline edit form ----------------------------------------
+  const [editSubBtn] = screen.getAllByRole('button', { name: /edit subtask/i });
+  await userEvent.click(editSubBtn);
+
+  const editSubTitleInput = screen.getByLabelText(/^edit subtask title/i);
+  const editSubDescInput = screen.getByLabelText(/^edit subtask description/i);
+
+  // Update the pre-filled values
+  await userEvent.clear(editSubTitleInput);
+  await userEvent.type(editSubTitleInput, 'Sub 1 (edited)');
+  await userEvent.clear(editSubDescInput);
+  await userEvent.type(editSubDescInput, 'Sub updated desc');
+
+  // Save the changes
+  const editSubForm = editSubTitleInput.closest('form');
+  const saveSubBtn = within(editSubForm).getByRole('button', { name: 'Save Subtask' });
+  await userEvent.click(saveSubBtn);
+
+  // New values are shown, the edit form is closed, and the parent remains
+  expect(screen.getByText('Sub 1 (edited)')).toBeInTheDocument();
+  expect(screen.getByText('Sub updated desc')).toBeInTheDocument();
+  expect(screen.queryByLabelText(/^edit subtask title/i)).not.toBeInTheDocument();
+  expect(screen.getByText('Parent Task')).toBeInTheDocument();
+});

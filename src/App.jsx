@@ -7,6 +7,10 @@ import ButtonGroup from '@mui/material/ButtonGroup';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CssBaseline from '@mui/material/CssBaseline';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import Snackbar from '@mui/material/Snackbar';
@@ -62,7 +66,7 @@ function App() {
     addTask,
     toggleTask,
     deleteTask,
-    insertTask,
+    insertTasks,
     editTask,
     addSubtask,
     toggleSubtask,
@@ -84,9 +88,13 @@ function App() {
       return 'all';
     }
   });
-  // The most recently deleted task plus its position, so a delete can be
-  // undone from the snackbar. `null` means there is nothing to undo.
-  const [deletedTask, setDeletedTask] = useState(null);
+  // Tasks (with their original positions) that can still be undone: one
+  // entry per removed task, so both single deletes and "clear completed"
+  // offer an undo from the snackbar. `null` means nothing to undo.
+  const [pendingUndo, setPendingUndo] = useState(null);
+  // A valid import waiting for the user’s decision (replace or merge);
+  // `null` means the confirmation dialog is closed.
+  const [pendingImport, setPendingImport] = useState(null);
   // Whether the last import attempt failed (bad file contents).
   const [importError, setImportError] = useState(false);
   // Ref to the new‑task title field so focus can fall back to it when the
@@ -137,7 +145,7 @@ function App() {
     const task = tasks[index];
     const remaining = tasks.filter((t) => t.id !== id);
     deleteTask(id);
-    setDeletedTask({ task, index });
+    setPendingUndo({ items: [{ task, index }] });
     const target = remaining[Math.min(index, remaining.length - 1)];
     const targetElement = target
       ? document.getElementById(`done-${target.id}`)
@@ -145,14 +153,24 @@ function App() {
     (targetElement ?? titleInputRef.current)?.focus();
   };
 
-  // Re‑insert the deleted task at its original position.
-  const handleUndoDelete = () => {
-    if (!deletedTask) return;
-    insertTask(deletedTask.task, deletedTask.index);
-    setDeletedTask(null);
+  // Re‑insert all undone tasks at their original positions.
+  const handleUndo = () => {
+    if (!pendingUndo) return;
+    insertTasks(pendingUndo.items);
+    setPendingUndo(null);
   };
 
-  const closeUndoSnackbar = () => setDeletedTask(null);
+  const closeUndoSnackbar = () => setPendingUndo(null);
+
+  // Remove every completed task and remember it (with its position) so
+  // the snackbar can offer an undo, like for single deletes.
+  const handleClearCompleted = () => {
+    const removed = tasks
+      .map((task, index) => ({ task, index }))
+      .filter(({ task }) => task.done);
+    clearCompleted();
+    if (removed.length > 0) setPendingUndo({ items: removed });
+  };
 
   // Open the hidden file picker for importing a task list.
   const handleImportClick = () => fileInputRef.current?.click();
@@ -175,7 +193,37 @@ function App() {
       return;
     }
     setImportError(false);
-    replaceTasks(parsed);
+    // An empty list can be replaced without asking; otherwise the user
+    // decides between replacing the list and merging the import into it,
+    // so importing never destroys existing tasks silently.
+    if (tasks.length === 0) {
+      replaceTasks(parsed);
+    } else {
+      setPendingImport(parsed);
+    }
+  };
+
+  const closeImportDialog = () => setPendingImport(null);
+
+  // Replace the whole list with the imported tasks.
+  const handleImportReplace = () => {
+    if (!pendingImport) return;
+    replaceTasks(pendingImport);
+    setPendingImport(null);
+  };
+
+  // Keep the current tasks and append the imported ones that do not
+  // already exist (matched by id), so merging never duplicates or
+  // overwrites.
+  const handleImportMerge = () => {
+    if (!pendingImport) return;
+    const existingIds = new Set(tasks.map((task) => task.id));
+    const merged = [
+      ...tasks,
+      ...pendingImport.filter((task) => !existingIds.has(task.id)),
+    ];
+    replaceTasks(merged);
+    setPendingImport(null);
   };
 
   // The task list as shown by the active filter
@@ -322,7 +370,11 @@ function App() {
                 } active`}
               </Typography>
               {completedCount > 0 && (
-                <Button size="small" color="error" onClick={clearCompleted}>
+                <Button
+                  size="small"
+                  color="error"
+                  onClick={handleClearCompleted}
+                >
                   Clear completed
                 </Button>
               )}
@@ -385,7 +437,7 @@ function App() {
           are kept in state and re‑inserted when "Undo" is pressed. The
           snackbar auto‑disappears after a few seconds. */}
         <Snackbar
-          open={Boolean(deletedTask)}
+          open={Boolean(pendingUndo)}
           autoHideDuration={6000}
           onClose={closeUndoSnackbar}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
@@ -396,14 +448,57 @@ function App() {
             variant="filled"
             onClose={closeUndoSnackbar}
             action={
-              <Button color="inherit" size="small" onClick={handleUndoDelete}>
+              <Button color="inherit" size="small" onClick={handleUndo}>
                 Undo
               </Button>
             }
           >
-            {deletedTask ? `Deleted "${deletedTask.task.title}"` : ''}
+            {pendingUndo
+              ? pendingUndo.items.length === 1
+                ? `Deleted "${pendingUndo.items[0].task.title}"`
+                : `Deleted ${pendingUndo.items.length} tasks`
+              : ''}
           </Alert>
         </Snackbar>
+
+        {/* Confirmation before an import may replace the current list: the
+          user picks between replacing it and merging the imported tasks
+          into it. */}
+        <Dialog
+          open={Boolean(pendingImport)}
+          onClose={closeImportDialog}
+          aria-labelledby="import-dialog-title"
+        >
+          <DialogTitle id="import-dialog-title">Import tasks?</DialogTitle>
+          <DialogContent>
+            <Typography component="p" color="text.secondary">
+              This file contains{' '}
+              {pendingImport &&
+                (pendingImport.length === 1
+                  ? '1 task'
+                  : `${pendingImport.length} tasks`)}
+              .
+            </Typography>
+            <Typography component="p" color="text.secondary">
+              Replacing removes your current tasks (export them first if you
+              need a copy); merging keeps your tasks and adds the imported ones,
+              skipping tasks whose id already exists.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeImportDialog}>Cancel</Button>
+            <Button onClick={handleImportMerge} variant="outlined">
+              Merge into list
+            </Button>
+            <Button
+              onClick={handleImportReplace}
+              variant="contained"
+              color="warning"
+            >
+              Replace list
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Warning shown while a persistence attempt has failed (storage full
           or unavailable): the list still works, but changes may not survive

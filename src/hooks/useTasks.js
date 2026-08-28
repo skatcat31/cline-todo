@@ -103,12 +103,17 @@ export function tasksReducer(tasks, action) {
       );
     case 'delete-task':
       return tasks.filter((t) => t.id !== action.id);
-    case 'insert-task': {
-      // Re‑insert a task at a given position (used by "undo delete"). The
-      // index is clamped so stale positions never drop or corrupt the list.
+    case 'insert-tasks': {
+      // Re‑insert previously removed tasks at their remembered
+      // positions (used by "undo", for both single deletes and "clear
+      // completed"). Indices are applied in ascending order and clamped
+      // so stale positions never drop or corrupt the list.
       const next = [...tasks];
-      const index = Math.max(0, Math.min(action.index, next.length));
-      next.splice(index, 0, action.task);
+      const items = [...action.items].sort((a, b) => a.index - b.index);
+      for (const { task, index } of items) {
+        const clamped = Math.max(0, Math.min(index, next.length));
+        next.splice(clamped, 0, task);
+      }
       return next;
     }
     case 'edit-task':
@@ -185,13 +190,14 @@ export function tasksReducer(tasks, action) {
  * persistence (lazy load before the first render, save on every change).
  *
  * Returns `{ tasks, persistFailed, addTask, toggleTask, deleteTask,
- * insertTask, editTask, addSubtask, toggleSubtask, deleteSubtask,
+ * insertTasks, editTask, addSubtask, toggleSubtask, deleteSubtask,
  * editSubtask, clearCompleted, replaceTasks }`.
  * `addSubtask` returns the id of the created subtask so callers can move
  * focus to it after it has rendered. `persistFailed` is true after a
  * persistence attempt could not write to storage (quota exceeded,
- * private‑browsing mode, …) so the UI can warn the user. `insertTask`
- * re‑adds a task at a given position (used for "undo delete").
+ * private‑browsing mode, …) so the UI can warn the user.
+ * `insertTasks` re‑adds previously removed tasks at their remembered
+ * positions (used for "undo" - single deletes and "clear completed").
  * `replaceTasks` swaps the whole list for a normalized one (JSON import).
  */
 export function useTasks() {
@@ -244,9 +250,9 @@ export function useTasks() {
       }),
     toggleTask: (id) => dispatch({ type: 'toggle-task', id }),
     deleteTask: (id) => dispatch({ type: 'delete-task', id }),
-    // Re‑add a (previously deleted) task at a given position for "undo".
-    insertTask: (task, index) =>
-      dispatch({ type: 'insert-task', task, index: index ?? 0 }),
+    // Re‑add previously removed tasks at their remembered positions
+    // (used by "undo" - single deletes and "clear completed").
+    insertTasks: (items) => dispatch({ type: 'insert-tasks', items }),
     editTask: (id, { title, description }) =>
       dispatch({
         type: 'edit-task',

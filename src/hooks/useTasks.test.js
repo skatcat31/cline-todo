@@ -288,23 +288,31 @@ describe('useTasks', () => {
     });
   });
 
-  test('insertTask re‑adds a task at a given position', () => {
+  test('insertTasks re‑adds removed tasks at their positions', () => {
     const { result } = renderHook(() => useTasks());
     let taskA;
+    let taskB;
     act(() => {
       result.current.addTask('Task A', '');
       result.current.addTask('Task B', '');
+      result.current.addTask('Task C', '');
     });
-    [taskA] = result.current.tasks;
+    [taskA, taskB] = result.current.tasks;
     act(() => {
       result.current.deleteTask(taskA.id);
+      result.current.deleteTask(taskB.id);
     });
+    expect(result.current.tasks.map((t) => t.title)).toEqual(['Task C']);
     act(() => {
-      result.current.insertTask(taskA, 0);
+      result.current.insertTasks([
+        { task: taskA, index: 0 },
+        { task: taskB, index: 1 },
+      ]);
     });
     expect(result.current.tasks.map((t) => t.title)).toEqual([
       'Task A',
       'Task B',
+      'Task C',
     ]);
   });
 
@@ -332,40 +340,41 @@ describe('tasksReducer', () => {
     expect(tasksReducer(tasks, { type: 'unknown' })).toBe(tasks);
   });
 
-  test('insert-task places the task at the given index without mutating', () => {
+  test('insert-tasks places the tasks at the given indices without mutating', () => {
     const existing = [
       { id: 'a', title: 'A', done: false, subtasks: [] },
       { id: 'b', title: 'B', done: false, subtasks: [] },
     ];
-    const inserted = { id: 'x', title: 'X', done: false, subtasks: [] };
+    const x = { id: 'x', title: 'X', done: false, subtasks: [] };
+    const y = { id: 'y', title: 'Y', done: false, subtasks: [] };
     const after = tasksReducer(existing, {
-      type: 'insert-task',
-      task: inserted,
-      index: 1,
+      type: 'insert-tasks',
+      items: [
+        { task: x, index: 0 },
+        { task: y, index: 3 },
+      ],
     });
-    expect(after.map((t) => t.id)).toEqual(['a', 'x', 'b']);
+    expect(after.map((t) => t.id)).toEqual(['x', 'a', 'b', 'y']);
     // The previous state array must not have been mutated.
     expect(existing.map((t) => t.id)).toEqual(['a', 'b']);
   });
 
-  test('insert-task clamps out‑of‑range indices instead of corrupting', () => {
+  test('insert-tasks clamps out‑of‑range indices instead of corrupting', () => {
     const existing = [
       { id: 'a', title: 'A', done: false, subtasks: [] },
       { id: 'b', title: 'B', done: false, subtasks: [] },
     ];
-    const inserted = { id: 'x', title: 'X', done: false, subtasks: [] };
+    const x = { id: 'x', title: 'X', done: false, subtasks: [] };
     expect(
       tasksReducer(existing, {
-        type: 'insert-task',
-        task: inserted,
-        index: 99,
+        type: 'insert-tasks',
+        items: [{ task: x, index: 99 }],
       }).map((t) => t.id),
     ).toEqual(['a', 'b', 'x']);
     expect(
       tasksReducer(existing, {
-        type: 'insert-task',
-        task: inserted,
-        index: -3,
+        type: 'insert-tasks',
+        items: [{ task: x, index: -3 }],
       }).map((t) => t.id),
     ).toEqual(['x', 'a', 'b']);
   });

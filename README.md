@@ -6,15 +6,16 @@ browser's `localStorage`.
 
 ## Features
 
-- Add, edit and delete tasks with optional descriptions – deletions offer an
-  "Undo" snackbar
+- Add, edit and delete tasks with optional descriptions – deletions (and
+  "Clear completed") offer an "Undo" snackbar
 - Add, edit, complete and delete nested subtasks, with per‑task progress
   ("2 of 5 subtasks done")
 - Filter the list by status (All / Active / Completed) – the selection is
   remembered across reloads – with an active‑task counter and a "clear
   completed" action
 - Automatic persistence to `localStorage`, including cross‑tab sync
-- Export / import the task list as a JSON file
+- Export the task list as a JSON file; importing into a non‑empty list asks
+  whether to replace it or merge the imported tasks into it
 - Light / dark color scheme: app‑bar toggle, persisted choice, follows the
   OS preference on first visit
 - Progressive Web App: installable and fully usable offline

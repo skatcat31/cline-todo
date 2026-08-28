@@ -59,12 +59,6 @@ export default function SubtaskItem({ sub, onToggle, onDelete, onEdit }) {
         >
           {sub.title}
         </Typography>
-        <Button type="button" size="small" onClick={startEdit}>
-          Edit Subtask
-        </Button>
-        <Button type="button" size="small" color="error" onClick={onDelete}>
-          Delete Subtask
-        </Button>
       </Box>
       {sub.description && (
         <Typography
@@ -75,6 +69,15 @@ export default function SubtaskItem({ sub, onToggle, onDelete, onEdit }) {
           {sub.description}
         </Typography>
       )}
+      {/* Action buttons, aligned with the subtask's details */}
+      <Box display="flex" gap={1} sx={{ ml: 4 }}>
+        <Button type="button" size="small" onClick={startEdit}>
+          Edit Subtask
+        </Button>
+        <Button type="button" size="small" color="error" onClick={onDelete}>
+          Delete Subtask
+        </Button>
+      </Box>
       {isEditing && (
         <Box component="form" onSubmit={saveEdit} sx={{ ml: 4, mt: 1 }}>
           <TextField
@@ -98,7 +101,7 @@ export default function SubtaskItem({ sub, onToggle, onDelete, onEdit }) {
             Save Subtask
           </Button>
           <Button type="button" size="small" onClick={cancelEdit} sx={{ mt: 1 }}>
-            Cancel Subtask
+            Cancel Edit
           </Button>
         </Box>
       )}

@@ -137,6 +137,9 @@ export function tasksReducer(tasks, action) {
             }
           : t,
       );
+    case 'clear-completed':
+      // Drop every top‑level task that is marked done.
+      return tasks.filter((t) => !t.done);
     default:
       return tasks;
   }
@@ -214,5 +217,6 @@ export function useTasks() {
         title: title.trim(),
         description: description.trim(),
       }),
+    clearCompleted: () => dispatch({ type: 'clear-completed' }),
   };
 }

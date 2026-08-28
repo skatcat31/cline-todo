@@ -8,6 +8,8 @@ browser's `localStorage`.
 
 - Add, edit and delete tasks with optional descriptions
 - Add, edit, complete and delete nested subtasks
+- Filter the list by status (All / Active / Completed) with an active-task
+  counter and a "clear completed" action
 - Automatic persistence to `localStorage`
 - Accessible Material Design UI (keyboard focus management,
   screen‑reader labels)

@@ -219,8 +219,11 @@ test('add task without description does not render description element', async (
 
   // Title should appear
   expect(screen.getByText('Title Only')).toBeInTheDocument();
-  // Description paragraph should not be rendered
-  expect(screen.queryByText(/.+/i, { selector: 'p' })).not.toBeInTheDocument();
+  // The task's row must not contain a description paragraph
+  const taskItem = screen.getByText('Title Only').closest('li');
+  expect(
+    within(taskItem).queryByText(/.+/i, { selector: 'p' }),
+  ).not.toBeInTheDocument();
 });
 
 /**
@@ -694,4 +697,81 @@ test('persists tasks to localStorage as they change', async () => {
     done: false,
     subtasks: [],
   });
+});
+
+/**
+ * The filter bar shows only the tasks matching the selected filter, and the
+ * counter reflects how many tasks are still active.
+ */
+test('filters tasks by All / Active / Completed', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  // Complete the first task
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+
+  // The counter reflects the split
+  expect(screen.getByText('1 of 2 tasks active')).toBeInTheDocument();
+
+  // The Completed filter shows only the done task
+  await userEvent.click(screen.getByRole('button', { name: 'Completed' }));
+  expect(screen.getByText('Task A')).toBeInTheDocument();
+  expect(screen.queryByText('Task B')).not.toBeInTheDocument();
+
+  // The Active filter shows only the open task
+  await userEvent.click(screen.getByRole('button', { name: 'Active' }));
+  expect(screen.getByText('Task B')).toBeInTheDocument();
+  expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+
+  // The All filter shows both again
+  await userEvent.click(screen.getByRole('button', { name: 'All' }));
+  expect(screen.getByText('Task A')).toBeInTheDocument();
+  expect(screen.getByText('Task B')).toBeInTheDocument();
+});
+
+/**
+ * When the active filter matches no tasks, a hint is shown instead of a
+ * misleading empty list.
+ */
+test('shows a hint when the active filter has no matching tasks', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  // Complete the only task, then switch to the Active filter
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Active' }));
+  expect(screen.getByText(/no active tasks/i)).toBeInTheDocument();
+});
+
+/**
+ * "Clear completed" removes only the completed tasks and disappears once no
+ * completed tasks remain.
+ */
+test('clear completed removes only the completed tasks', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  // Complete the first task – the "Clear completed" button appears
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+  const clearBtn = screen.getByRole('button', { name: /clear completed/i });
+  await userEvent.click(clearBtn);
+
+  expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+  expect(screen.getByText('Task B')).toBeInTheDocument();
+  // No completed tasks left -> the button is gone
+  expect(
+    screen.queryByRole('button', { name: /clear completed/i }),
+  ).not.toBeInTheDocument();
 });

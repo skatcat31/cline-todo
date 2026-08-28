@@ -162,6 +162,23 @@ describe('useTasks', () => {
       description: 'new',
     });
   });
+
+  test('clearCompleted removes only the completed tasks', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      result.current.addTask('Task A', '');
+      result.current.addTask('Task B', '');
+    });
+    const [firstTask] = result.current.tasks;
+    act(() => {
+      result.current.toggleTask(firstTask.id);
+    });
+    act(() => {
+      result.current.clearCompleted();
+    });
+    expect(result.current.tasks).toHaveLength(1);
+    expect(result.current.tasks[0].title).toBe('Task B');
+  });
 });
 
 describe('tasksReducer', () => {

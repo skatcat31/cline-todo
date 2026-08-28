@@ -7,15 +7,23 @@ import { afterEach, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 // localStorage polyfill
 // ---------------------------------------------------------------------------
-// In the test environment `globalThis.localStorage` is not defined (jsdom does
-// not expose Web Storage here and Node's experimental global is disabled).
-// Production code in `App.jsx` references the `localStorage` global directly,
-// so we install a minimal in-memory implementation for tests. Keeping this shim
-// in the test harness (instead of the app source) means the production code can
-// safely assume a standard Web API is present.
-if (typeof globalThis.localStorage === 'undefined') {
-  const store = new Map();
-  globalThis.localStorage = {
+// Whatever `globalThis.localStorage` is in the test environment, it must be a
+// plain object so that `vi.spyOn(localStorage, 'setItem')` reliably
+// intercepts writes (tests simulate quota errors this way). It is not:
+//   - With Node 24 (what CI runs) Vitest's jsdom environment exposes jsdom's
+//     own Storage, which is a Proxy: assigning to or defining properties on
+//     e.g. `setItem` only stores a string under that key in the storage area,
+//     so spies on the instance never intercept anything.
+//   - With newer Node versions a native `localStorage` global exists that is
+//     `undefined` unless `--localstorage-file` is set (and, being a getter
+//     without a setter, cannot simply be reassigned).
+// Production code references the `localStorage` global directly, so install a
+// minimal in-memory implementation for tests and *always* replace whatever is
+// there. Keeping this shim in the test harness (instead of the app source)
+// means the production code can safely assume a standard Web API is present.
+const store = new Map();
+Object.defineProperty(globalThis, 'localStorage', {
+  value: {
     getItem: (key) => (store.has(key) ? store.get(key) : null),
     setItem: (key, value) => {
       store.set(String(key), String(value));
@@ -30,8 +38,10 @@ if (typeof globalThis.localStorage === 'undefined') {
     get length() {
       return store.size;
     },
-  };
-}
+  },
+  writable: true,
+  configurable: true,
+});
 
 // ---------------------------------------------------------------------------
 // Per-test isolation

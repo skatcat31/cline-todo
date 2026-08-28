@@ -7,6 +7,51 @@ const STORAGE_KEY = 'tasks';
 const nextId = () => crypto.randomUUID();
 
 /**
+ * Validate and normalize a task list loaded from storage.
+ *
+ * localStorage is not trustworthy (older app versions, hand edits or a
+ * half-written value can produce a malformed shape), so anything that does
+ * not look like a task/subtask is dropped and the remaining entries are
+ * coerced to the exact shape the UI expects.
+ */
+export function normalizeTasks(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (task) =>
+        task &&
+        typeof task === 'object' &&
+        typeof task.id === 'string' &&
+        typeof task.title === 'string',
+    )
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      description: typeof task.description === 'string' ? task.description : '',
+      done: Boolean(task.done),
+      subtasks: Array.isArray(task.subtasks)
+        ? task.subtasks
+            .filter(
+              (subtask) =>
+                subtask &&
+                typeof subtask === 'object' &&
+                typeof subtask.id === 'string' &&
+                typeof subtask.title === 'string',
+            )
+            .map((subtask) => ({
+              id: subtask.id,
+              title: subtask.title,
+              description:
+                typeof subtask.description === 'string'
+                  ? subtask.description
+                  : '',
+              done: Boolean(subtask.done),
+            }))
+        : [],
+    }));
+}
+
+/**
  * Reducer handling all task mutations. Kept as a pure, exported function so
  * it can be unit‑tested without rendering any components.
  *
@@ -114,8 +159,11 @@ export function useTasks() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return;
     try {
-      // Assume stored data is a valid tasks array.
-      dispatch({ type: 'hydrate', tasks: JSON.parse(stored) });
+      // Validate/normalize before using: stored data is untrusted.
+      dispatch({
+        type: 'hydrate',
+        tasks: normalizeTasks(JSON.parse(stored)),
+      });
     } catch (error) {
       console.error('Failed to parse tasks from storage', error);
     }

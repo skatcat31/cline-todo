@@ -626,3 +626,72 @@ test('editing a subtask updates its title and description', async () => {
   ).not.toBeInTheDocument();
   expect(screen.getByText('Parent Task')).toBeInTheDocument();
 });
+
+/**
+ * Tasks stored in localStorage under the `tasks` key are loaded on mount,
+ * including their done state and subtasks.
+ */
+test('loads tasks from localStorage on mount', () => {
+  localStorage.setItem(
+    'tasks',
+    JSON.stringify([
+      {
+        id: 'stored-1',
+        title: 'Stored task',
+        description: 'Stored description',
+        done: true,
+        subtasks: [
+          {
+            id: 'stored-sub-1',
+            title: 'Stored subtask',
+            description: '',
+            done: false,
+          },
+        ],
+      },
+    ]),
+  );
+  render(<App />);
+  expect(screen.getByText('Stored task')).toBeInTheDocument();
+  expect(screen.getByText('Stored description')).toBeInTheDocument();
+  expect(screen.getByText('Stored subtask')).toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: 'Stored task' })).toBeChecked();
+});
+
+/**
+ * Corrupt JSON in localStorage must not crash the app: the error is logged,
+ * no tasks are loaded and the empty state is shown.
+ */
+test('ignores corrupt JSON in localStorage', () => {
+  localStorage.setItem('tasks', '{ not valid json');
+  render(<App />);
+  expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument();
+});
+
+/**
+ * Well-formed JSON with a wrong shape (e.g. an object instead of an array)
+ * is normalized away instead of being rendered blindly.
+ */
+test('normalizes badly shaped task data from localStorage', () => {
+  localStorage.setItem('tasks', JSON.stringify({ not: 'an array' }));
+  render(<App />);
+  expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument();
+});
+
+/**
+ * Tasks are written to localStorage whenever they change.
+ */
+test('persists tasks to localStorage as they change', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Persisted task');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+  const stored = JSON.parse(localStorage.getItem('tasks'));
+  expect(stored).toHaveLength(1);
+  expect(stored[0]).toMatchObject({
+    title: 'Persisted task',
+    description: '',
+    done: false,
+    subtasks: [],
+  });
+});

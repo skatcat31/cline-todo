@@ -14,14 +14,14 @@ browser's `localStorage`.
 
 ## Tech stack
 
-| Concern      | Choice                                                        |
-| ------------ | ------------------------------------------------------------- |
-| UI           | React 19, MUI 5 (direct‑path imports), Emotion                 |
-| Build        | Vite 8                                                        |
-| Tests        | Vitest 4, Testing Library, jsdom (80% coverage thresholds)     |
-| Lint/format  | ESLint 9 (flat config), Prettier                              |
-| CI/CD        | GitHub Actions → GitHub Pages                                 |
-| Container    | Multi‑stage Docker build (Node → nginx)                       |
+| Concern     | Choice                                                     |
+| ----------- | ---------------------------------------------------------- |
+| UI          | React 19, MUI 5 (direct‑path imports), Emotion             |
+| Build       | Vite 8                                                     |
+| Tests       | Vitest 4, Testing Library, jsdom (80% coverage thresholds) |
+| Lint/format | ESLint 9 (flat config), Prettier                           |
+| CI/CD       | GitHub Actions → GitHub Pages                              |
+| Container   | Multi‑stage Docker build (Node → nginx)                    |
 
 ## Getting started
 
@@ -32,16 +32,16 @@ npm run dev # start the dev server
 
 ## Scripts
 
-| Script                 | Description                            |
-| ---------------------- | -------------------------------------- |
-| `npm run dev`          | Start the Vite dev server              |
-| `npm test`             | Run the test suite once                |
-| `npm run test:watch`   | Run tests in watch mode                |
-| `npm run lint`         | ESLint over the whole project          |
-| `npm run format`       | Prettier (write)                       |
-| `npm run format:check` | Prettier (check)                       |
-| `npm run build`        | Production build into `dist/`          |
-| `npm run preview`      | Preview the production build locally   |
+| Script                 | Description                          |
+| ---------------------- | ------------------------------------ |
+| `npm run dev`          | Start the Vite dev server            |
+| `npm test`             | Run the test suite once              |
+| `npm run test:watch`   | Run tests in watch mode              |
+| `npm run lint`         | ESLint over the whole project        |
+| `npm run format`       | Prettier (write)                     |
+| `npm run format:check` | Prettier (check)                     |
+| `npm run build`        | Production build into `dist/`        |
+| `npm run preview`      | Preview the production build locally |
 
 Coverage is enforced at 80% (statements, branches, functions and lines) in
 `vite.config.js`; run it with `npm test -- --coverage`.

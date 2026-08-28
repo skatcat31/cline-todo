@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
-import { tasksReducer, useTasks } from './useTasks.js';
+import { normalizeTasks, tasksReducer, useTasks } from './useTasks.js';
 
 /**
  * Unit tests for the task state owned by `useTasks`. They exercise the hook
@@ -168,5 +168,43 @@ describe('tasksReducer', () => {
   test('ignores unknown actions and returns the state untouched', () => {
     const tasks = [{ id: 'a', title: 'A', done: false, subtasks: [] }];
     expect(tasksReducer(tasks, { type: 'unknown' })).toBe(tasks);
+  });
+});
+
+describe('normalizeTasks', () => {
+  test('returns an empty list for non-array input', () => {
+    expect(normalizeTasks(null)).toEqual([]);
+    expect(normalizeTasks('nope')).toEqual([]);
+    expect(normalizeTasks({ tasks: [] })).toEqual([]);
+  });
+
+  test('drops entries that are not task-shaped and coerces the rest', () => {
+    const normalized = normalizeTasks([
+      'garbage',
+      null,
+      { id: 42, title: 7 },
+      { id: 't1', title: 'Task', done: 'yes', subtasks: 'nope' },
+    ]);
+    expect(normalized).toEqual([
+      { id: 't1', title: 'Task', description: '', done: true, subtasks: [] },
+    ]);
+  });
+
+  test('keeps valid subtasks and drops the invalid ones', () => {
+    const normalized = normalizeTasks([
+      {
+        id: 't1',
+        title: 'Task',
+        description: 'desc',
+        done: false,
+        subtasks: [
+          { id: 's1', title: 'Sub', description: null, done: 1 },
+          'junk',
+        ],
+      },
+    ]);
+    expect(normalized[0].subtasks).toEqual([
+      { id: 's1', title: 'Sub', description: '', done: true },
+    ]);
   });
 });

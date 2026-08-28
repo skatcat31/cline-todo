@@ -18,7 +18,8 @@ browser's `localStorage`.
   whether to replace it or merge the imported tasks into it
 - Light / dark color scheme: app‑bar toggle, persisted choice, follows the
   OS preference on first visit
-- Progressive Web App: installable and fully usable offline
+- Progressive Web App: installable (SVG + 192/512 PNG + maskable icons) and
+  fully usable offline, including the self‑hosted Roboto typeface
 - Accessible Material Design UI (keyboard focus management, screen‑reader
   labels, Escape closes inline forms)
 
@@ -42,16 +43,17 @@ npm run dev # start the dev server
 
 ## Scripts
 
-| Script                 | Description                          |
-| ---------------------- | ------------------------------------ |
-| `npm run dev`          | Start the Vite dev server            |
-| `npm test`             | Run the test suite once              |
-| `npm run test:watch`   | Run tests in watch mode              |
-| `npm run lint`         | ESLint over the whole project        |
-| `npm run format`       | Prettier (write)                     |
-| `npm run format:check` | Prettier (check)                     |
-| `npm run build`        | Production build into `dist/`        |
-| `npm run preview`      | Preview the production build locally |
+| Script                 | Description                                                        |
+| ---------------------- | ------------------------------------------------------------------ |
+| `npm run dev`          | Start the Vite dev server                                          |
+| `npm test`             | Run the test suite once                                            |
+| `npm run test:watch`   | Run tests in watch mode                                            |
+| `npm run lint`         | ESLint over the whole project                                      |
+| `npm run format`       | Prettier (write)                                                   |
+| `npm run format:check` | Prettier (check)                                                   |
+| `npm run build`        | Production build into `dist/`                                      |
+| `npm run preview`      | Preview the production build locally                               |
+| `npm run icons`        | Regenerate the PWA icons from the favicon design (`public/icons/`) |
 
 Coverage is enforced at 80% (statements, branches, functions and lines) in
 `vite.config.js`; run it with `npm test -- --coverage`.

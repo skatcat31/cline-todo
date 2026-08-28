@@ -109,7 +109,7 @@ export default function TaskItem({
             Save Task
           </Button>
           <Button type="button" onClick={cancelEdit} sx={{ mt: 1 }}>
-            Cancel Task
+            Cancel Edit
           </Button>
         </Box>
       )}

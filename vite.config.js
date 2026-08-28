@@ -7,7 +7,9 @@ export default defineConfig({
   // When deploying to GitHub Pages the site is served from a sub‑path
   // matching the repository name. Vite's `base` option handles this.
   // The environment variable GITHUB_REPOSITORY is of the form "owner/repo".
-  base: process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/',
+  base: process.env.GITHUB_REPOSITORY
+    ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/`
+    : '/',
   // Vitest configuration – use jsdom environment for DOM APIs
   test: {
     environment: 'jsdom',

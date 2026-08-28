@@ -1,4 +1,3 @@
-import React from 'react';
 import App from './App';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -38,7 +37,9 @@ test('full task & subtask flow works correctly', async () => {
   // ---- Open sub‑task form ----------------------------------------------
   // There are two "Add Subtask" buttons: one to open the form and one to submit.
   // Grab the first one (the button element, not the submit button) to open the form.
-  const [openSubtaskBtn] = screen.getAllByRole('button', { name: /add subtask/i });
+  const [openSubtaskBtn] = screen.getAllByRole('button', {
+    name: /add subtask/i,
+  });
   await userEvent.click(openSubtaskBtn);
 
   // Sub‑task form fields become visible within the newly rendered form.
@@ -46,7 +47,9 @@ test('full task & subtask flow works correctly', async () => {
   const subDescInput = screen.getByLabelText(/subtask description/i);
   // Locate the submit button inside the same form as the title input.
   const form = subTitleInput.closest('form');
-  const submitSubtaskBtn = within(form).getByRole('button', { name: /add subtask$/i });
+  const submitSubtaskBtn = within(form).getByRole('button', {
+    name: /add subtask$/i,
+  });
 
   // ---- Add a sub‑task ---------------------------------------------------
   await userEvent.type(subTitleInput, 'Subtask A');
@@ -60,7 +63,9 @@ test('full task & subtask flow works correctly', async () => {
   expect(screen.queryByLabelText(/subtask title/i)).not.toBeInTheDocument();
 
   // Focus should be on the newly added checkbox (aria-label "subtask done")
-  const newCheckbox = await screen.findByRole('checkbox', { name: 'Subtask A' });
+  const newCheckbox = await screen.findByRole('checkbox', {
+    name: 'Subtask A',
+  });
   await waitFor(() => {
     expect(newCheckbox).toHaveFocus();
   });
@@ -95,12 +100,16 @@ test('toggle task and subtask done works correctly', async () => {
   expect(taskTitle).toHaveStyle('text-decoration: line-through');
 
   // ---- Open sub‑task form ----------------------------------------------
-  const [openSubtaskBtn] = screen.getAllByRole('button', { name: /add subtask/i });
+  const [openSubtaskBtn] = screen.getAllByRole('button', {
+    name: /add subtask/i,
+  });
   await userEvent.click(openSubtaskBtn);
   const subTitleInput = screen.getByLabelText(/subtask title/i);
   const subDescInput = screen.getByLabelText(/subtask description/i);
   const form = subTitleInput.closest('form');
-  const submitSubtaskBtn = within(form).getByRole('button', { name: /add subtask$/i });
+  const submitSubtaskBtn = within(form).getByRole('button', {
+    name: /add subtask$/i,
+  });
 
   // ---- Add sub‑task -----------------------------------------------------
   await userEvent.type(subTitleInput, 'Subtask B');
@@ -125,7 +134,6 @@ test('toggle task and subtask done works correctly', async () => {
 test('add task with empty title does not create a task', async () => {
   render(<App />);
 
-  const titleInput = screen.getByLabelText(/title/i);
   const descInput = screen.getByLabelText(/description/i);
   const addTaskBtn = screen.getByRole('button', { name: /add task/i });
 
@@ -168,7 +176,9 @@ test('add subtask with empty title does not create subtask', async () => {
   await userEvent.click(addTaskBtn);
 
   // Open sub‑task form for the newly added task.
-  const [openSubtaskBtn] = screen.getAllByRole('button', { name: /add subtask/i });
+  const [openSubtaskBtn] = screen.getAllByRole('button', {
+    name: /add subtask/i,
+  });
   await userEvent.click(openSubtaskBtn);
 
   // The form is now visible – leave title empty and attempt to submit.
@@ -189,7 +199,9 @@ test('add subtask with empty title does not create subtask', async () => {
 test('initial render shows no‑tasks placeholder', async () => {
   render(<App />);
   // The placeholder paragraph should be present
-  expect(screen.getByText(/no tasks yet\. add one above!/i)).toBeInTheDocument();
+  expect(
+    screen.getByText(/no tasks yet\. add one above!/i),
+  ).toBeInTheDocument();
 });
 
 /**
@@ -207,8 +219,11 @@ test('add task without description does not render description element', async (
 
   // Title should appear
   expect(screen.getByText('Title Only')).toBeInTheDocument();
-  // Description paragraph should not be rendered
-  expect(screen.queryByText(/.+/i, { selector: 'p' })).not.toBeInTheDocument();
+  // The task's row must not contain a description paragraph
+  const taskItem = screen.getByText('Title Only').closest('li');
+  expect(
+    within(taskItem).queryByText(/.+/i, { selector: 'p' }),
+  ).not.toBeInTheDocument();
 });
 
 /**
@@ -284,7 +299,9 @@ test('toggle first subtask when multiple subtasks exist', async () => {
   const subTitleInput2 = screen.getByLabelText(/subtask title/i);
   const subDescInput2 = screen.getByLabelText(/subtask description/i);
   const form2 = subTitleInput2.closest('form');
-  const submitBtn2 = within(form2).getByRole('button', { name: /add subtask$/i });
+  const submitBtn2 = within(form2).getByRole('button', {
+    name: /add subtask$/i,
+  });
   await userEvent.type(subTitleInput2, 'Second Sub');
   await userEvent.type(subDescInput2, 'Second Desc');
   await userEvent.click(submitBtn2);
@@ -385,7 +402,6 @@ test('add subtask without description does not render description element', asyn
   await userEvent.click(openSubBtn);
 
   const subTitleInput = screen.getByLabelText(/subtask title/i);
-  const subDescInput = screen.getByLabelText(/subtask description/i);
   const form = subTitleInput.closest('form');
   const submitBtn = within(form).getByRole('button', { name: /add subtask$/i });
 
@@ -422,7 +438,9 @@ test('deleting a task removes it from the list', async () => {
   expect(screen.getByText('Task 2')).toBeInTheDocument();
 
   // Delete the first task
-  const deleteTaskBtns = screen.getAllByRole('button', { name: /delete task/i });
+  const deleteTaskBtns = screen.getAllByRole('button', {
+    name: /delete task/i,
+  });
   await userEvent.click(deleteTaskBtns[0]);
 
   expect(screen.queryByText('Task 1')).not.toBeInTheDocument();
@@ -469,7 +487,9 @@ test('deleting a subtask removes it from its parent task', async () => {
   expect(screen.getByText('Sub 2')).toBeInTheDocument();
 
   // Delete the first subtask
-  const deleteSubBtns = screen.getAllByRole('button', { name: /delete subtask/i });
+  const deleteSubBtns = screen.getAllByRole('button', {
+    name: /delete subtask/i,
+  });
   await userEvent.click(deleteSubBtns[0]);
 
   expect(screen.queryByText('Sub 1')).not.toBeInTheDocument();
@@ -493,7 +513,9 @@ test('deleting the last task shows the empty placeholder', async () => {
   await userEvent.click(addTaskBtn);
   expect(screen.getByText('Only Task')).toBeInTheDocument();
 
-  const [deleteTaskBtn] = screen.getAllByRole('button', { name: /delete task/i });
+  const [deleteTaskBtn] = screen.getAllByRole('button', {
+    name: /delete task/i,
+  });
   await userEvent.click(deleteTaskBtn);
 
   expect(screen.queryByText('Only Task')).not.toBeInTheDocument();
@@ -534,7 +556,9 @@ test('editing a task updates its title and description', async () => {
 
   // Save the changes
   const editForm = editTitleInput.closest('form');
-  const saveTaskBtn = within(editForm).getByRole('button', { name: 'Save Task' });
+  const saveTaskBtn = within(editForm).getByRole('button', {
+    name: 'Save Task',
+  });
   await userEvent.click(saveTaskBtn);
 
   // New values are shown and the edit form is closed
@@ -566,7 +590,9 @@ test('editing a subtask updates its title and description', async () => {
   const subTitleInput = screen.getByLabelText(/^subtask title/i);
   const subDescInput = screen.getByLabelText(/^subtask description/i);
   const subForm = subTitleInput.closest('form');
-  const submitSubBtn = within(subForm).getByRole('button', { name: /add subtask$/i });
+  const submitSubBtn = within(subForm).getByRole('button', {
+    name: /add subtask$/i,
+  });
 
   await userEvent.type(subTitleInput, 'Sub 1');
   await userEvent.type(subDescInput, 'Sub 1 Desc');
@@ -590,12 +616,162 @@ test('editing a subtask updates its title and description', async () => {
 
   // Save the changes
   const editSubForm = editSubTitleInput.closest('form');
-  const saveSubBtn = within(editSubForm).getByRole('button', { name: 'Save Subtask' });
+  const saveSubBtn = within(editSubForm).getByRole('button', {
+    name: 'Save Subtask',
+  });
   await userEvent.click(saveSubBtn);
 
   // New values are shown, the edit form is closed, and the parent remains
   expect(screen.getByText('Sub 1 (edited)')).toBeInTheDocument();
   expect(screen.getByText('Sub updated desc')).toBeInTheDocument();
-  expect(screen.queryByLabelText(/^edit subtask title/i)).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText(/^edit subtask title/i),
+  ).not.toBeInTheDocument();
   expect(screen.getByText('Parent Task')).toBeInTheDocument();
+});
+
+/**
+ * Tasks stored in localStorage under the `tasks` key are loaded on mount,
+ * including their done state and subtasks.
+ */
+test('loads tasks from localStorage on mount', () => {
+  localStorage.setItem(
+    'tasks',
+    JSON.stringify([
+      {
+        id: 'stored-1',
+        title: 'Stored task',
+        description: 'Stored description',
+        done: true,
+        subtasks: [
+          {
+            id: 'stored-sub-1',
+            title: 'Stored subtask',
+            description: '',
+            done: false,
+          },
+        ],
+      },
+    ]),
+  );
+  render(<App />);
+  expect(screen.getByText('Stored task')).toBeInTheDocument();
+  expect(screen.getByText('Stored description')).toBeInTheDocument();
+  expect(screen.getByText('Stored subtask')).toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: 'Stored task' })).toBeChecked();
+});
+
+/**
+ * Corrupt JSON in localStorage must not crash the app: the error is logged,
+ * no tasks are loaded and the empty state is shown.
+ */
+test('ignores corrupt JSON in localStorage', () => {
+  localStorage.setItem('tasks', '{ not valid json');
+  render(<App />);
+  expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument();
+});
+
+/**
+ * Well-formed JSON with a wrong shape (e.g. an object instead of an array)
+ * is normalized away instead of being rendered blindly.
+ */
+test('normalizes badly shaped task data from localStorage', () => {
+  localStorage.setItem('tasks', JSON.stringify({ not: 'an array' }));
+  render(<App />);
+  expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument();
+});
+
+/**
+ * Tasks are written to localStorage whenever they change.
+ */
+test('persists tasks to localStorage as they change', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Persisted task');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+  const stored = JSON.parse(localStorage.getItem('tasks'));
+  expect(stored).toHaveLength(1);
+  expect(stored[0]).toMatchObject({
+    title: 'Persisted task',
+    description: '',
+    done: false,
+    subtasks: [],
+  });
+});
+
+/**
+ * The filter bar shows only the tasks matching the selected filter, and the
+ * counter reflects how many tasks are still active.
+ */
+test('filters tasks by All / Active / Completed', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  // Complete the first task
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+
+  // The counter reflects the split
+  expect(screen.getByText('1 of 2 tasks active')).toBeInTheDocument();
+
+  // The Completed filter shows only the done task
+  await userEvent.click(screen.getByRole('button', { name: 'Completed' }));
+  expect(screen.getByText('Task A')).toBeInTheDocument();
+  expect(screen.queryByText('Task B')).not.toBeInTheDocument();
+
+  // The Active filter shows only the open task
+  await userEvent.click(screen.getByRole('button', { name: 'Active' }));
+  expect(screen.getByText('Task B')).toBeInTheDocument();
+  expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+
+  // The All filter shows both again
+  await userEvent.click(screen.getByRole('button', { name: 'All' }));
+  expect(screen.getByText('Task A')).toBeInTheDocument();
+  expect(screen.getByText('Task B')).toBeInTheDocument();
+});
+
+/**
+ * When the active filter matches no tasks, a hint is shown instead of a
+ * misleading empty list.
+ */
+test('shows a hint when the active filter has no matching tasks', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  // Complete the only task, then switch to the Active filter
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Active' }));
+  expect(screen.getByText(/no active tasks/i)).toBeInTheDocument();
+});
+
+/**
+ * "Clear completed" removes only the completed tasks and disappears once no
+ * completed tasks remain.
+ */
+test('clear completed removes only the completed tasks', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  // Complete the first task – the "Clear completed" button appears
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+  const clearBtn = screen.getByRole('button', { name: /clear completed/i });
+  await userEvent.click(clearBtn);
+
+  expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+  expect(screen.getByText('Task B')).toBeInTheDocument();
+  // No completed tasks left -> the button is gone
+  expect(
+    screen.queryByRole('button', { name: /clear completed/i }),
+  ).not.toBeInTheDocument();
 });

@@ -1,0 +1,15 @@
+# Dependencies – reinstalled from the lockfile in the build stage
+node_modules
+
+# Build output
+dist
+coverage
+
+# VCS / CI (not needed for the image)
+.git
+.github
+
+# Misc
+.env
+.DS_Store
+npm-debug.log

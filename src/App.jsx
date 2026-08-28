@@ -12,18 +12,21 @@ function App() {
   // State for the list of tasks
   const [tasks, setTasks] = useState([]);
   // State for adding a subtask to a specific parent task
-  const [subtaskParentIdx, setSubtaskParentIdx] = useState(null);
+  const [subtaskParentId, setSubtaskParentId] = useState(null);
   const [subtaskTitle, setSubtaskTitle] = useState('');
   const [subtaskDescription, setSubtaskDescription] = useState('');
   // Controlled input state for new task
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  // Tracks the id of the most recently added subtask so we can move focus to it
+  const [focusTarget, setFocusTarget] = useState(null);
 
   // Handle adding a new top‑level task
   const handleAddTask = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
     const newTask = {
+      id: crypto.randomUUID(),
       title: title.trim(),
       description: description.trim(),
       done: false,
@@ -35,19 +38,61 @@ function App() {
   };
 
   // Toggle the "done" state of a task
-  const toggleDone = (index) => {
+  const toggleDone = (id) => {
     setTasks((prev) =>
-      prev.map((t, i) => (i === index ? { ...t, done: !t.done } : t))
+      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
     );
   };
 
-  // Toggle done for a subtask given parent and subtask indexes
-  const toggleSubtaskDone = (parentIdx, subIdx) => {
+  // Toggle done for a subtask given parent and subtask ids
+  const toggleSubtaskDone = (parentId, subId) => {
     setTasks((prev) =>
-      prev.map((t, i) => {
-        if (i !== parentIdx) return t;
-        const newSubs = t.subtasks.map((s, si) =>
-          si === subIdx ? { ...s, done: !s.done } : s
+      prev.map((t) => {
+        if (t.id !== parentId) return t;
+        const newSubs = t.subtasks.map((s) =>
+          s.id === subId ? { ...s, done: !s.done } : s
+        );
+        return { ...t, subtasks: newSubs };
+      })
+    );
+  };
+
+  // Delete a top‑level task by its id
+  const deleteTask = (id) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Delete a subtask (given parent and subtask ids) from its parent task
+  const deleteSubtask = (parentId, subId) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === parentId
+          ? { ...t, subtasks: t.subtasks.filter((s) => s.id !== subId) }
+          : t
+      )
+    );
+  };
+
+  // Update a top‑level task's title and description by its id
+  const editTask = (id, { title, description }) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, title: title.trim(), description: description.trim() }
+          : t
+      )
+    );
+  };
+
+  // Update a subtask's title and description given parent and subtask ids
+  const editSubtask = (parentId, subId, { title, description }) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== parentId) return t;
+        const newSubs = t.subtasks.map((s) =>
+          s.id === subId
+            ? { ...s, title: title.trim(), description: description.trim() }
+            : s
         );
         return { ...t, subtasks: newSubs };
       })
@@ -57,45 +102,31 @@ function App() {
   // Handle adding a subtask to the currently selected parent
   const handleAddSubtask = (e) => {
     e.preventDefault();
-    if (subtaskParentIdx === null) return;
+    if (subtaskParentId === null) return;
     if (!subtaskTitle.trim()) return;
+    const newSubId = crypto.randomUUID();
     const newSub = {
+      id: newSubId,
       title: subtaskTitle.trim(),
       description: subtaskDescription.trim(),
       done: false,
     };
-    const newIdx = tasks[subtaskParentIdx]?.subtasks?.length ?? 0;
     setTasks((prev) =>
-      prev.map((t, i) => {
-        if (i !== subtaskParentIdx) return t;
+      prev.map((t) => {
+        if (t.id !== subtaskParentId) return t;
         return { ...t, subtasks: [...t.subtasks, newSub] };
       })
     );
     setSubtaskTitle('');
     setSubtaskDescription('');
-    setSubtaskParentIdx(null);
-    // After state updates, move focus to the newly added subtask checkbox so the user knows it was added
-    setTimeout(() => {
-      const checkbox = document.getElementById(`sub-done-${subtaskParentIdx}-${newIdx}`);
-      checkbox?.focus();
-    }, 0);
+    setSubtaskParentId(null);
+    // Ask the focus effect (below) to move focus to the newly added subtask checkbox
+    setFocusTarget(newSubId);
   };
-
-  // Simple storage shim: use the real localStorage when available, otherwise a no‑op shim.
-  // This eliminates conditional branches to improve test coverage.
-  // Use a ternary to safely obtain localStorage when it exists, otherwise fallback to a no‑op shim.
-  // This avoids ReferenceError in environments where localStorage is undefined.
-  // eslint-disable-next-line no-undef
-  const storage = typeof localStorage !== 'undefined'
-    ? localStorage
-    : {
-        getItem: () => null,
-        setItem: () => {},
-      };
 
   // Load tasks from storage on component mount
   useEffect(() => {
-    const stored = storage.getItem('tasks');
+    const stored = localStorage.getItem('tasks');
     if (stored) {
       try {
         // Assume stored data is a valid tasks array.
@@ -108,8 +139,16 @@ function App() {
 
   // Persist tasks to storage whenever they change
   useEffect(() => {
-    storage.setItem('tasks', JSON.stringify(tasks));
+    localStorage.setItem('tasks', JSON.stringify(tasks));
   }, [tasks]);
+
+  // When a subtask is added, move focus to its checkbox once it has been rendered
+  useEffect(() => {
+    if (focusTarget === null) return;
+    const checkbox = document.getElementById(`sub-done-${focusTarget}`);
+    checkbox?.focus();
+    setFocusTarget(null);
+  }, [focusTarget]);
 
   return (
     <Box component="section" sx={{ p: 2, maxWidth: 600, mx: "auto" }}>
@@ -148,15 +187,18 @@ function App() {
        {/* List of tasks */}
        {tasks.length > 0 && (
          <List component="ul" disablePadding>
-           {tasks.map((task, idx) => (
+           {tasks.map((task) => (
              <TaskItem
-               key={idx}
+               key={task.id}
                task={task}
-               idx={idx}
                toggleDone={toggleDone}
+               deleteTask={deleteTask}
+               editTask={editTask}
                toggleSubtaskDone={toggleSubtaskDone}
-               subtaskParentIdx={subtaskParentIdx}
-               setSubtaskParentIdx={setSubtaskParentIdx}
+               deleteSubtask={deleteSubtask}
+               editSubtask={editSubtask}
+               subtaskParentId={subtaskParentId}
+               setSubtaskParentId={setSubtaskParentId}
                subtaskTitle={subtaskTitle}
                setSubtaskTitle={setSubtaskTitle}
                subtaskDescription={subtaskDescription}

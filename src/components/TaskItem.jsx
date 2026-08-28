@@ -105,6 +105,20 @@ export default function TaskItem({
         </Box>
       </Box>
 
+      {/* Subtask progress: "2 of 5 subtasks done" below the task text */}
+      {task.subtasks && task.subtasks.length > 0 && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: 'block', pl: 5, mt: 0.5 }}
+          aria-live="polite"
+        >
+          {`${task.subtasks.filter((s) => s.done).length} of ${
+            task.subtasks.length
+          } ${task.subtasks.length === 1 ? 'subtask' : 'subtasks'} done`}
+        </Typography>
+      )}
+
       {/* Action row: Material icon buttons for adding a subtask, editing and deleting */}
       <Box display="flex" alignItems="center" gap={0.5} sx={{ pl: 5, mt: 0.5 }}>
         <IconButton
@@ -127,9 +141,17 @@ export default function TaskItem({
         </IconButton>
       </Box>
 
-      {/* Edit form (shown only while editing this task) */}
+      {/* Edit form (shown only while editing this task). Escape cancels the
+          edit; the title field receives focus when the form opens. */}
       {isEditing && (
-        <Box component="form" onSubmit={saveEdit} sx={{ mt: 1, pl: 5 }}>
+        <Box
+          component="form"
+          onSubmit={saveEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') cancelEdit();
+          }}
+          sx={{ mt: 1, pl: 5 }}
+        >
           <TextField
             id={`edit-title-${task.id}`}
             label="Edit Title"
@@ -138,6 +160,7 @@ export default function TaskItem({
             required
             fullWidth
             margin="normal"
+            autoFocus
           />
           <TextField
             id={`edit-desc-${task.id}`}
@@ -175,6 +198,7 @@ export default function TaskItem({
       {/* Subtask entry form (shown only while open for this task) */}
       {subtaskFormOpen && (
         <SubtaskForm
+          idPrefix={task.id}
           onSubmit={handleAddSubtask}
           onCancel={() => setSubtaskFormOpen(false)}
         />

@@ -1,10 +1,15 @@
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 
 // localStorage key under which the task list is persisted.
-const STORAGE_KEY = 'tasks';
+export const STORAGE_KEY = 'tasks';
 
-// Generate a unique id for new tasks and subtasks.
-const nextId = () => crypto.randomUUID();
+// Generate a unique id for new tasks and subtasks. `crypto.randomUUID` is
+// only available in secure contexts (https, localhost), so fall back to a
+// time/random based id elsewhere instead of crashing.
+const nextId = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 /**
  * Validate and normalize a task list loaded from storage.
@@ -52,6 +57,24 @@ export function normalizeTasks(value) {
 }
 
 /**
+ * Read and normalize the persisted task list. Used as the lazy initializer
+ * for the reducer so the very first render already shows the stored tasks
+ * (no empty‑list flash, no redundant write of an empty list before
+ * hydration). Returns an empty list when nothing is stored or the stored
+ * value cannot be parsed.
+ */
+function loadTasks() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return [];
+    return normalizeTasks(JSON.parse(stored));
+  } catch (error) {
+    console.error('Failed to parse tasks from storage', error);
+    return [];
+  }
+}
+
+/**
  * Reducer handling all task mutations. Kept as a pure, exported function so
  * it can be unit‑tested without rendering any components.
  *
@@ -80,6 +103,14 @@ export function tasksReducer(tasks, action) {
       );
     case 'delete-task':
       return tasks.filter((t) => t.id !== action.id);
+    case 'insert-task': {
+      // Re‑insert a task at a given position (used by "undo delete"). The
+      // index is clamped so stale positions never drop or corrupt the list.
+      const next = [...tasks];
+      const index = Math.max(0, Math.min(action.index, next.length));
+      next.splice(index, 0, action.task);
+      return next;
+    }
     case 'edit-task':
       return tasks.map((t) =>
         t.id === action.id
@@ -140,6 +171,10 @@ export function tasksReducer(tasks, action) {
     case 'clear-completed':
       // Drop every top‑level task that is marked done.
       return tasks.filter((t) => !t.done);
+    case 'replace-tasks':
+      // Replace the whole list (used by JSON import; the caller passes an
+      // already normalized list).
+      return action.tasks;
     default:
       return tasks;
   }
@@ -147,38 +182,60 @@ export function tasksReducer(tasks, action) {
 
 /**
  * Owns the to‑do task list: every mutation plus the localStorage
- * persistence (load on mount, save on every change).
+ * persistence (lazy load before the first render, save on every change).
  *
- * Returns `{ tasks, addTask, toggleTask, deleteTask, editTask,
- * addSubtask, toggleSubtask, deleteSubtask, editSubtask }`.
+ * Returns `{ tasks, persistFailed, addTask, toggleTask, deleteTask,
+ * insertTask, editTask, addSubtask, toggleSubtask, deleteSubtask,
+ * editSubtask, clearCompleted, replaceTasks }`.
  * `addSubtask` returns the id of the created subtask so callers can move
- * focus to it after it has rendered.
+ * focus to it after it has rendered. `persistFailed` is true after a
+ * persistence attempt could not write to storage (quota exceeded,
+ * private‑browsing mode, …) so the UI can warn the user. `insertTask`
+ * re‑adds a task at a given position (used for "undo delete").
+ * `replaceTasks` swaps the whole list for a normalized one (JSON import).
  */
 export function useTasks() {
-  const [tasks, dispatch] = useReducer(tasksReducer, []);
-
-  // Load tasks from storage on component mount
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return;
-    try {
-      // Validate/normalize before using: stored data is untrusted.
-      dispatch({
-        type: 'hydrate',
-        tasks: normalizeTasks(JSON.parse(stored)),
-      });
-    } catch (error) {
-      console.error('Failed to parse tasks from storage', error);
-    }
-  }, []);
+  // Lazy initializer: the stored list is read exactly once, before the first
+  // render. This avoids the "no tasks yet" flash on load and the redundant
+  // write of an empty list that a load‑on‑mount effect would cause.
+  const [tasks, dispatch] = useReducer(tasksReducer, undefined, loadTasks);
+  // Whether the most recent persistence attempt failed.
+  const [persistFailed, setPersistFailed] = useState(false);
 
   // Persist tasks to storage whenever they change
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+      setPersistFailed(false);
+    } catch (error) {
+      // The write failed – keep the app usable and let the UI warn the user.
+      console.error('Failed to persist tasks to storage', error);
+      setPersistFailed(true);
+    }
   }, [tasks]);
+
+  // Keep multiple open tabs in sync: when another tab writes the task list,
+  // re‑hydrate from its value. The event only fires in *other* tabs, so this
+  // cannot loop back into this tab's own writes.
+  useEffect(() => {
+    const handleStorage = (event) => {
+      if (event.key !== STORAGE_KEY || event.newValue === null) return;
+      try {
+        dispatch({
+          type: 'hydrate',
+          tasks: normalizeTasks(JSON.parse(event.newValue)),
+        });
+      } catch (error) {
+        console.error('Failed to parse tasks from storage event', error);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   return {
     tasks,
+    persistFailed,
     addTask: (title, description) =>
       dispatch({
         type: 'add-task',
@@ -187,6 +244,9 @@ export function useTasks() {
       }),
     toggleTask: (id) => dispatch({ type: 'toggle-task', id }),
     deleteTask: (id) => dispatch({ type: 'delete-task', id }),
+    // Re‑add a (previously deleted) task at a given position for "undo".
+    insertTask: (task, index) =>
+      dispatch({ type: 'insert-task', task, index: index ?? 0 }),
     editTask: (id, { title, description }) =>
       dispatch({
         type: 'edit-task',
@@ -218,5 +278,8 @@ export function useTasks() {
         description: description.trim(),
       }),
     clearCompleted: () => dispatch({ type: 'clear-completed' }),
+    // Swap the whole list for an already normalized one (JSON import).
+    replaceTasks: (nextTasks) =>
+      dispatch({ type: 'replace-tasks', tasks: nextTasks }),
   };
 }

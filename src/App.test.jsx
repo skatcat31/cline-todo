@@ -3,7 +3,7 @@ import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Compatibility layer for jest-dom with Vitest
 import '@testing-library/jest-dom/vitest';
-import { test, expect } from 'vitest';
+import { test, expect, vi } from 'vitest';
 
 /**
  * Simple smoke test using ReactDOMServer to ensure the component renders
@@ -774,4 +774,294 @@ test('clear completed removes only the completed tasks', async () => {
   expect(
     screen.queryByRole('button', { name: /clear completed/i }),
   ).not.toBeInTheDocument();
+});
+
+/**
+ * When the browser refuses to persist the task list (quota exceeded,
+ * private‑browsing mode, …) the app stays usable but shows a persistent
+ * warning instead of failing silently.
+ */
+test('warns while tasks cannot be persisted', async () => {
+  const setItemSpy = vi
+    .spyOn(globalThis.localStorage, 'setItem')
+    .mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    render(<App />);
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText(/could not be saved/i)).toBeInTheDocument();
+  } finally {
+    setItemSpy.mockRestore();
+    errorSpy.mockRestore();
+  }
+});
+
+/**
+ * Deleting a task offers an undo: the snackbar action re‑inserts the task
+ * at its original position.
+ */
+test('undo restores a deleted task at its original position', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  const itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Delete task' }),
+  );
+  expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+
+  await userEvent.click(await screen.findByRole('button', { name: /^undo$/i }));
+  expect(screen.getByText('Task A')).toBeInTheDocument();
+  // The task must be back at its original position (before Task B).
+  const items = screen.getAllByRole('listitem');
+  expect(items[0]).toHaveAccessibleName('Task A');
+  expect(items[1]).toHaveAccessibleName('Task B');
+});
+
+/**
+ * Deleting a task must not leave the keyboard focus on a removed element:
+ * it moves to the task that now occupies the deleted task's position.
+ */
+test('keeps focus inside the list after deleting a task', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  const itemB = screen.getByRole('listitem', { name: 'Task B' });
+  await userEvent.click(
+    within(itemB).getByRole('button', { name: 'Delete task' }),
+  );
+  await waitFor(() => {
+    expect(screen.getByRole('checkbox', { name: 'Task A' })).toHaveFocus();
+  });
+});
+
+/**
+ * Escape cancels the task edit form without saving (the title field is
+ * focused when the form opens, so the key reaches the form's handler).
+ */
+test('Escape closes the task edit form', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  const itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Edit task' }),
+  );
+  const editTitle = screen.getByLabelText(/^edit title/i);
+  expect(editTitle).toHaveFocus();
+
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByLabelText(/^edit title/i)).not.toBeInTheDocument();
+  // The original title must be untouched.
+  expect(screen.getByText('Task A')).toBeInTheDocument();
+});
+
+/**
+ * Escape closes the "add subtask" form without creating a subtask.
+ */
+test('Escape closes the subtask form', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  const itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Add subtask' }),
+  );
+  const subTitle = screen.getByLabelText(/subtask title/i);
+  expect(subTitle).toHaveFocus();
+
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByLabelText(/subtask title/i)).not.toBeInTheDocument();
+  // No subtask must have been created.
+  expect(
+    screen.queryByRole('checkbox', { name: /sub/i }),
+  ).not.toBeInTheDocument();
+});
+
+/**
+ * Tasks with subtasks show "x of y subtask(s) done", which updates as
+ * subtasks are completed.
+ */
+test('shows subtask progress that updates as subtasks are completed', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  // Add two subtasks
+  let itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Add subtask' }),
+  );
+  let subTitleInput = screen.getByLabelText(/subtask title/i);
+  await userEvent.type(subTitleInput, 'Sub 1');
+  let subtaskForm = subTitleInput.closest('form');
+  await userEvent.click(
+    within(subtaskForm).getByRole('button', { name: /add subtask$/i }),
+  );
+  expect(screen.getByText('0 of 1 subtask done')).toBeInTheDocument();
+
+  itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Add subtask' }),
+  );
+  subTitleInput = screen.getByLabelText(/subtask title/i);
+  await userEvent.type(subTitleInput, 'Sub 2');
+  subtaskForm = subTitleInput.closest('form');
+  await userEvent.click(
+    within(subtaskForm).getByRole('button', { name: /add subtask$/i }),
+  );
+  expect(screen.getByText('0 of 2 subtasks done')).toBeInTheDocument();
+
+  // Complete one subtask
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Sub 1' }));
+  expect(screen.getByText('1 of 2 subtasks done')).toBeInTheDocument();
+});
+
+/**
+ * The active filter is persisted, so a "reload" (unmount + mount) restores
+ * the previously selected view.
+ */
+test('remembers the selected filter across reloads', async () => {
+  const view = render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Completed' }));
+
+  view.unmount();
+  render(<App />);
+  expect(screen.getByRole('button', { name: 'Completed' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
+/**
+ * "Export tasks" downloads the list as a JSON file. jsdom does not implement
+ * URL.createObjectURL or anchor navigation, so both are stubbed.
+ */
+test('exports the task list as a JSON file', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  let createdBlob;
+  const createObjectURL = vi.fn((blob) => {
+    createdBlob = blob;
+    return 'blob:mock';
+  });
+  const revokeObjectURL = vi.fn();
+  globalThis.URL.createObjectURL = createObjectURL;
+  globalThis.URL.revokeObjectURL = revokeObjectURL;
+  const clickSpy = vi
+    .spyOn(HTMLAnchorElement.prototype, 'click')
+    .mockImplementation(() => {});
+  try {
+    await userEvent.click(screen.getByRole('button', { name: 'Export tasks' }));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const exported = JSON.parse(await createdBlob.text());
+    expect(exported).toHaveLength(1);
+    expect(exported[0]).toMatchObject({ title: 'Task A', done: false });
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+  } finally {
+    clickSpy.mockRestore();
+  }
+});
+
+/**
+ * "Import tasks" replaces the current list with the (normalized) contents of
+ * the chosen JSON file.
+ */
+test('imports tasks from a JSON file', async () => {
+  render(<App />);
+  // Pre‑populate so the test proves the import *replaces* the list.
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Existing');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  const file = new File(
+    [JSON.stringify([{ id: 'i1', title: 'Imported', done: true }])],
+    'tasks.json',
+    { type: 'application/json' },
+  );
+  await userEvent.upload(document.querySelector('input[type="file"]'), file);
+
+  expect(await screen.findByText('Imported')).toBeInTheDocument();
+  expect(screen.queryByText('Existing')).not.toBeInTheDocument();
+});
+
+/**
+ * Importing a file that is not a valid task list shows an error and leaves
+ * the current list untouched.
+ */
+test('rejects files that are not a valid task list', async () => {
+  render(<App />);
+  const file = new File([JSON.stringify({ not: 'a list' })], 'bad.json', {
+    type: 'application/json',
+  });
+  await userEvent.upload(document.querySelector('input[type="file"]'), file);
+
+  expect(await screen.findByText(/import failed/i)).toBeInTheDocument();
+  expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument();
+});
+
+/**
+ * The app bar offers a light/dark toggle; the choice is persisted so a
+ * "reload" keeps the selected color scheme.
+ */
+test('toggles the theme and persists the choice', async () => {
+  render(<App />);
+  const toggle = screen.getByRole('button', { name: 'Switch to dark mode' });
+  await userEvent.click(toggle);
+
+  expect(
+    screen.getByRole('button', { name: 'Switch to light mode' }),
+  ).toBeInTheDocument();
+  expect(localStorage.getItem('todo-theme')).toBe('dark');
+});
+
+/**
+ * An explicitly stored theme preference wins over the OS preference.
+ */
+test('uses the stored theme preference', () => {
+  localStorage.setItem('todo-theme', 'dark');
+  render(<App />);
+  expect(
+    screen.getByRole('button', { name: 'Switch to light mode' }),
+  ).toBeInTheDocument();
+});
+
+/**
+ * Without a stored preference the app follows the OS color-scheme setting.
+ */
+test('defaults to dark when the system prefers dark', () => {
+  const originalMatchMedia = window.matchMedia;
+  window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+  try {
+    render(<App />);
+    expect(
+      screen.getByRole('button', { name: 'Switch to light mode' }),
+    ).toBeInTheDocument();
+  } finally {
+    window.matchMedia = originalMatchMedia;
+  }
 });

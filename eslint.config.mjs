@@ -57,6 +57,7 @@ export default [
     files: [
       'vite.config.js',
       'vite.config.test.js',
+      'playwright.config.js',
       'eslint.config.mjs',
       'scripts/**',
     ],

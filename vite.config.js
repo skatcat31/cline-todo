@@ -49,7 +49,7 @@ export const pwaOptions = {
     // Precache the app shell so it loads offline – including the
     // self‑hosted font files, so the Material typography survives a
     // disconnect too.
-    globPatterns: ['**/*.{js,css,svg,woff2}'],
+    globPatterns: ['**/*.{js,css,html,webmanifest,svg,woff2}'],
   },
 };
 
@@ -76,6 +76,8 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     // Optional: increase timeout for async UI interactions
     timeout: 5000,
+    // The Playwright specs in e2e/ are run with `playwright test`, not Vitest
+    exclude: ['dist', 'node_modules', 'e2e/**'],
   },
   // Vitest coverage configuration – enforce minimum 80% coverage for all metrics
   // This ensures CI pipelines will fail if coverage drops below the required threshold.

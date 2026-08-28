@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import AppBar from '@mui/material/AppBar';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import List from '@mui/material/List';
+import Snackbar from '@mui/material/Snackbar';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -19,6 +21,7 @@ import { useTasks } from './hooks/useTasks.js';
 function App() {
   const {
     tasks,
+    persistFailed,
     addTask,
     toggleTask,
     deleteTask,
@@ -186,6 +189,20 @@ function App() {
           </Card>
         )}
       </Box>
+
+      {/* Warning shown while a persistence attempt has failed (storage full
+          or unavailable): the list still works, but changes may not survive
+          a reload. It stays visible until the next successful write. */}
+      <Snackbar
+        open={persistFailed}
+        autoHideDuration={null}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{ mt: 8 }}
+      >
+        <Alert severity="warning">
+          Tasks could not be saved to this browser – changes may be lost.
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

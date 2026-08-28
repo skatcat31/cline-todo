@@ -3,7 +3,7 @@ import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Compatibility layer for jest-dom with Vitest
 import '@testing-library/jest-dom/vitest';
-import { test, expect } from 'vitest';
+import { test, expect, vi } from 'vitest';
 
 /**
  * Simple smoke test using ReactDOMServer to ensure the component renders
@@ -774,4 +774,26 @@ test('clear completed removes only the completed tasks', async () => {
   expect(
     screen.queryByRole('button', { name: /clear completed/i }),
   ).not.toBeInTheDocument();
+});
+
+/**
+ * When the browser refuses to persist the task list (quota exceeded,
+ * private‑browsing mode, …) the app stays usable but shows a persistent
+ * warning instead of failing silently.
+ */
+test('warns while tasks cannot be persisted', async () => {
+  const setItemSpy = vi
+    .spyOn(globalThis.localStorage, 'setItem')
+    .mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    render(<App />);
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText(/could not be saved/i)).toBeInTheDocument();
+  } finally {
+    setItemSpy.mockRestore();
+    errorSpy.mockRestore();
+  }
 });

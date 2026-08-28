@@ -175,6 +175,7 @@ export default function TaskItem({
       {/* Subtask entry form (shown only while open for this task) */}
       {subtaskFormOpen && (
         <SubtaskForm
+          idPrefix={task.id}
           onSubmit={handleAddSubtask}
           onCancel={() => setSubtaskFormOpen(false)}
         />

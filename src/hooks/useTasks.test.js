@@ -1,6 +1,11 @@
 import { renderHook, act } from '@testing-library/react';
-import { describe, expect, test } from 'vitest';
-import { normalizeTasks, tasksReducer, useTasks } from './useTasks.js';
+import { describe, expect, test, vi } from 'vitest';
+import {
+  STORAGE_KEY,
+  normalizeTasks,
+  tasksReducer,
+  useTasks,
+} from './useTasks.js';
 
 /**
  * Unit tests for the task state owned by `useTasks`. They exercise the hook
@@ -11,6 +16,126 @@ describe('useTasks', () => {
   test('starts with an empty task list', () => {
     const { result } = renderHook(() => useTasks());
     expect(result.current.tasks).toEqual([]);
+  });
+
+  test('loads persisted tasks on the very first render (no hydration flash)', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([{ id: 'stored-1', title: 'Stored task', done: true }]),
+    );
+    const { result } = renderHook(() => useTasks());
+    // The lazy initializer runs synchronously during the first render, so the
+    // stored list is already visible without any state update.
+    expect(result.current.tasks).toEqual([
+      {
+        id: 'stored-1',
+        title: 'Stored task',
+        description: '',
+        done: true,
+        subtasks: [],
+      },
+    ]);
+  });
+
+  test('falls back to an empty list when the stored value is corrupt', () => {
+    localStorage.setItem(STORAGE_KEY, '{not valid json');
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { result } = renderHook(() => useTasks());
+      expect(result.current.tasks).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test('hydrates from the value written by another tab', () => {
+    const { result } = renderHook(() => useTasks());
+    expect(result.current.tasks).toHaveLength(0);
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: STORAGE_KEY,
+          newValue: JSON.stringify([
+            { id: 'other-1', title: 'From other tab' },
+          ]),
+        }),
+      );
+    });
+    expect(result.current.tasks).toHaveLength(1);
+    expect(result.current.tasks[0].title).toBe('From other tab');
+  });
+
+  test('ignores storage events for other keys', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'something-else',
+          newValue: JSON.stringify([{ id: 'x', title: 'Not for us' }]),
+        }),
+      );
+    });
+    expect(result.current.tasks).toHaveLength(0);
+  });
+
+  test('reports persistFailed when a storage write throws', () => {
+    const { result } = renderHook(() => useTasks());
+    expect(result.current.persistFailed).toBe(false);
+    // Break storage after the initial (successful) write.
+    const setItemSpy = vi
+      .spyOn(globalThis.localStorage, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('quota exceeded');
+      });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      act(() => {
+        result.current.addTask('Task A', '');
+      });
+      expect(result.current.persistFailed).toBe(true);
+    } finally {
+      setItemSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  test('clears persistFailed once a write succeeds again', () => {
+    const { result } = renderHook(() => useTasks());
+    expect(result.current.persistFailed).toBe(false);
+    const setItemSpy = vi
+      .spyOn(globalThis.localStorage, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('quota exceeded');
+      });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      act(() => {
+        result.current.addTask('Task A', '');
+      });
+      expect(result.current.persistFailed).toBe(true);
+      setItemSpy.mockRestore();
+      act(() => {
+        result.current.toggleTask(result.current.tasks[0].id);
+      });
+      expect(result.current.persistFailed).toBe(false);
+    } finally {
+      setItemSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  test('generates ids even when crypto.randomUUID is unavailable', () => {
+    vi.stubGlobal('crypto', {});
+    try {
+      const { result } = renderHook(() => useTasks());
+      act(() => {
+        result.current.addTask('Task A', '');
+      });
+      expect(typeof result.current.tasks[0].id).toBe('string');
+      expect(result.current.tasks[0].id.length).toBeGreaterThan(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   test('addTask appends a task with defaults and trimmed values', () => {

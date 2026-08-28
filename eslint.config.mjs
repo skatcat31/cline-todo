@@ -5,6 +5,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
   // Generated / vendored output – never lint these.
@@ -26,6 +27,7 @@ export default [
     plugins: {
       react,
       'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
     },
     rules: {
       // The automatic JSX runtime (React 19) does not require `React` in
@@ -40,26 +42,13 @@ export default [
       'react/prop-types': 'off',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
+      // Vite Fast Refresh: warn when a module mixes component and
+      // non‑component exports (allow the default export pattern).
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
       'no-unused-vars': ['error', { varsIgnorePattern: '^_' }],
-    },
-  },
-
-  // Vitest globals (enabled via `globals: true` in vite.config.js) – only
-  // needed in test files; app source must keep importing what it uses.
-  {
-    files: ['**/*.test.{js,jsx}', 'src/test/**/*.{js,jsx}'],
-    languageOptions: {
-      globals: {
-        afterAll: 'readonly',
-        afterEach: 'readonly',
-        beforeAll: 'readonly',
-        beforeEach: 'readonly',
-        describe: 'readonly',
-        expect: 'readonly',
-        it: 'readonly',
-        test: 'readonly',
-        vi: 'readonly',
-      },
     },
   },
 

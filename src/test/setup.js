@@ -1,7 +1,8 @@
 // Global test setup for Vitest.
 // Loaded once before each test file via the `setupFiles` option in vite.config.js.
 
-import { beforeEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
+import { afterEach, beforeEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // localStorage polyfill
@@ -40,4 +41,14 @@ if (typeof globalThis.localStorage === 'undefined') {
 // store before every test so each starts from a clean slate.
 beforeEach(() => {
   globalThis.localStorage?.clear?.();
+});
+
+// Unmount components rendered by the previous test.
+//
+// @testing-library/react normally registers this cleanup automatically, but
+// only when the test framework exposes an `afterEach` global. This project
+// runs Vitest *without* `globals: true` (tests import their APIs explicitly),
+// so the cleanup is registered here instead.
+afterEach(() => {
+  cleanup();
 });

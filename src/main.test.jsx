@@ -7,6 +7,7 @@
 import { act, screen } from '@testing-library/react';
 // Compatibility layer for jest-dom matchers with Vitest
 import '@testing-library/jest-dom/vitest';
+import { beforeAll, expect, test } from 'vitest';
 
 // Ensure a root element exists before importing the module which performs the
 // ReactDOM.createRoot(...).render() call.

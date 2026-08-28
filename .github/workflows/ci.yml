@@ -8,6 +8,11 @@ on:
   # Allow manual triggering of the workflow from the GitHub UI
   workflow_dispatch:
 
+# Cancel a superseded run for the same branch/PR instead of queueing it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -26,6 +31,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
 
       - name: Run tests with coverage
         run: npm test -- --coverage

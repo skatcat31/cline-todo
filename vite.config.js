@@ -13,7 +13,6 @@ export default defineConfig({
   // Vitest configuration – use jsdom environment for DOM APIs
   test: {
     environment: 'jsdom',
-    globals: true,
     // Global test setup: localStorage polyfill + per-test isolation
     setupFiles: ['./src/test/setup.js'],
     // Optional: increase timeout for async UI interactions

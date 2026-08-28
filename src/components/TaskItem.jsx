@@ -105,6 +105,20 @@ export default function TaskItem({
         </Box>
       </Box>
 
+      {/* Subtask progress: "2 of 5 subtasks done" below the task text */}
+      {task.subtasks && task.subtasks.length > 0 && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: 'block', pl: 5, mt: 0.5 }}
+          aria-live="polite"
+        >
+          {`${task.subtasks.filter((s) => s.done).length} of ${
+            task.subtasks.length
+          } ${task.subtasks.length === 1 ? 'subtask' : 'subtasks'} done`}
+        </Typography>
+      )}
+
       {/* Action row: Material icon buttons for adding a subtask, editing and deleting */}
       <Box display="flex" alignItems="center" gap={0.5} sx={{ pl: 5, mt: 0.5 }}>
         <IconButton

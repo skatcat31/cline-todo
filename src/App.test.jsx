@@ -893,3 +893,133 @@ test('Escape closes the subtask form', async () => {
     screen.queryByRole('checkbox', { name: /sub/i }),
   ).not.toBeInTheDocument();
 });
+
+/**
+ * Tasks with subtasks show "x of y subtask(s) done", which updates as
+ * subtasks are completed.
+ */
+test('shows subtask progress that updates as subtasks are completed', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  // Add two subtasks
+  let itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Add subtask' }),
+  );
+  let subTitleInput = screen.getByLabelText(/subtask title/i);
+  await userEvent.type(subTitleInput, 'Sub 1');
+  let subtaskForm = subTitleInput.closest('form');
+  await userEvent.click(
+    within(subtaskForm).getByRole('button', { name: /add subtask$/i }),
+  );
+  expect(screen.getByText('0 of 1 subtask done')).toBeInTheDocument();
+
+  itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Add subtask' }),
+  );
+  subTitleInput = screen.getByLabelText(/subtask title/i);
+  await userEvent.type(subTitleInput, 'Sub 2');
+  subtaskForm = subTitleInput.closest('form');
+  await userEvent.click(
+    within(subtaskForm).getByRole('button', { name: /add subtask$/i }),
+  );
+  expect(screen.getByText('0 of 2 subtasks done')).toBeInTheDocument();
+
+  // Complete one subtask
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Sub 1' }));
+  expect(screen.getByText('1 of 2 subtasks done')).toBeInTheDocument();
+});
+
+/**
+ * The active filter is persisted, so a "reload" (unmount + mount) restores
+ * the previously selected view.
+ */
+test('remembers the selected filter across reloads', async () => {
+  const view = render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Completed' }));
+
+  view.unmount();
+  render(<App />);
+  expect(screen.getByRole('button', { name: 'Completed' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
+/**
+ * "Export tasks" downloads the list as a JSON file. jsdom does not implement
+ * URL.createObjectURL or anchor navigation, so both are stubbed.
+ */
+test('exports the task list as a JSON file', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  let createdBlob;
+  const createObjectURL = vi.fn((blob) => {
+    createdBlob = blob;
+    return 'blob:mock';
+  });
+  const revokeObjectURL = vi.fn();
+  globalThis.URL.createObjectURL = createObjectURL;
+  globalThis.URL.revokeObjectURL = revokeObjectURL;
+  const clickSpy = vi
+    .spyOn(HTMLAnchorElement.prototype, 'click')
+    .mockImplementation(() => {});
+  try {
+    await userEvent.click(screen.getByRole('button', { name: 'Export tasks' }));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const exported = JSON.parse(await createdBlob.text());
+    expect(exported).toHaveLength(1);
+    expect(exported[0]).toMatchObject({ title: 'Task A', done: false });
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+  } finally {
+    clickSpy.mockRestore();
+  }
+});
+
+/**
+ * "Import tasks" replaces the current list with the (normalized) contents of
+ * the chosen JSON file.
+ */
+test('imports tasks from a JSON file', async () => {
+  render(<App />);
+  // Pre‑populate so the test proves the import *replaces* the list.
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Existing');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  const file = new File(
+    [JSON.stringify([{ id: 'i1', title: 'Imported', done: true }])],
+    'tasks.json',
+    { type: 'application/json' },
+  );
+  await userEvent.upload(document.querySelector('input[type="file"]'), file);
+
+  expect(await screen.findByText('Imported')).toBeInTheDocument();
+  expect(screen.queryByText('Existing')).not.toBeInTheDocument();
+});
+
+/**
+ * Importing a file that is not a valid task list shows an error and leaves
+ * the current list untouched.
+ */
+test('rejects files that are not a valid task list', async () => {
+  render(<App />);
+  const file = new File([JSON.stringify({ not: 'a list' })], 'bad.json', {
+    type: 'application/json',
+  });
+  await userEvent.upload(document.querySelector('input[type="file"]'), file);
+
+  expect(await screen.findByText(/import failed/i)).toBeInTheDocument();
+  expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument();
+});

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -6,14 +6,23 @@ import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
+import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import Snackbar from '@mui/material/Snackbar';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import FileDownload from '@mui/icons-material/FileDownload';
+import FileUpload from '@mui/icons-material/FileUpload';
 import Placeholder from './components/Placeholder.jsx';
 import TaskItem from './components/TaskItem.jsx';
 import { useTasks } from './hooks/useTasks.js';
+import { downloadTasks, parseTasksFile } from './utils/taskFile.js';
+
+// localStorage key under which the active filter is remembered, plus the set
+// of values that key may legally hold (anything else falls back to "all").
+const FILTER_KEY = 'todo-filter';
+const FILTERS = ['all', 'active', 'completed'];
 
 // A simple To Do application allowing users to add tasks with a title and
 // description. Task state, mutations and persistence live in the `useTasks`
@@ -32,18 +41,40 @@ function App() {
     deleteSubtask,
     editSubtask,
     clearCompleted,
+    replaceTasks,
   } = useTasks();
   // Controlled input state for new task
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // Which list to show: "all", "active" or "completed"
-  const [filter, setFilter] = useState('all');
+  // Which list to show: "all", "active" or "completed" – remembered in
+  // localStorage so a reload restores the previous view.
+  const [filter, setFilter] = useState(() => {
+    try {
+      const stored = localStorage.getItem(FILTER_KEY);
+      return FILTERS.includes(stored) ? stored : 'all';
+    } catch {
+      return 'all';
+    }
+  });
   // The most recently deleted task plus its position, so a delete can be
   // undone from the snackbar. `null` means there is nothing to undo.
   const [deletedTask, setDeletedTask] = useState(null);
+  // Whether the last import attempt failed (bad file contents).
+  const [importError, setImportError] = useState(false);
   // Ref to the new‑task title field so focus can fall back to it when the
   // whole list becomes empty after a delete.
   const titleInputRef = useRef(null);
+  // Hidden file input used by the "Import tasks" button.
+  const fileInputRef = useRef(null);
+
+  // Remember the active filter (best effort – storage may be unavailable).
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTER_KEY, filter);
+    } catch {
+      // ignore – the filter simply will not be persisted
+    }
+  }, [filter]);
 
   // Handle adding a new top‑level task
   const handleAddTask = (e) => {
@@ -80,6 +111,30 @@ function App() {
 
   const closeUndoSnackbar = () => setDeletedTask(null);
 
+  // Open the hidden file picker for importing a task list.
+  const handleImportClick = () => fileInputRef.current?.click();
+
+  // Read the chosen file, validate it, and replace the list when valid.
+  // The input value is reset so the same file can be imported again.
+  const handleImportChange = async (e) => {
+    const input = e.target;
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    let parsed = null;
+    try {
+      parsed = parseTasksFile(await file.text());
+    } catch {
+      parsed = null;
+    }
+    if (parsed === null) {
+      setImportError(true);
+      return;
+    }
+    setImportError(false);
+    replaceTasks(parsed);
+  };
+
   // The task list as shown by the active filter
   const visibleTasks =
     filter === 'all'
@@ -92,12 +147,36 @@ function App() {
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
-      {/* Material app bar with the application title */}
+      {/* Material app bar with the application title and, on the right,
+          export/import actions (export only makes sense with tasks present) */}
       <AppBar position="sticky" elevation={1}>
         <Toolbar>
           <Typography variant="h6" component="h1" noWrap sx={{ flexGrow: 1 }}>
             To‑Do List
           </Typography>
+          {tasks.length > 0 && (
+            <IconButton
+              color="inherit"
+              aria-label="Export tasks"
+              onClick={() => downloadTasks(tasks)}
+            >
+              <FileDownload fontSize="small" />
+            </IconButton>
+          )}
+          <IconButton
+            color="inherit"
+            aria-label="Import tasks"
+            onClick={handleImportClick}
+          >
+            <FileUpload fontSize="small" />
+          </IconButton>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            onChange={handleImportChange}
+          />
         </Toolbar>
       </AppBar>
 
@@ -223,6 +302,19 @@ function App() {
           </Card>
         )}
       </Box>
+
+      {/* Error prompt shown after a failed import; auto‑disappears */}
+      <Snackbar
+        open={importError}
+        autoHideDuration={6000}
+        onClose={() => setImportError(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{ mb: 2 }}
+      >
+        <Alert severity="error">
+          Import failed – the file is not a valid task list.
+        </Alert>
+      </Snackbar>
 
       {/* Undo prompt after a task was deleted: the task (and its position)
           are kept in state and re‑inserted when "Undo" is pressed. The

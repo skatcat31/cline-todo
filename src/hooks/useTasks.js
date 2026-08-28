@@ -171,6 +171,10 @@ export function tasksReducer(tasks, action) {
     case 'clear-completed':
       // Drop every top‑level task that is marked done.
       return tasks.filter((t) => !t.done);
+    case 'replace-tasks':
+      // Replace the whole list (used by JSON import; the caller passes an
+      // already normalized list).
+      return action.tasks;
     default:
       return tasks;
   }
@@ -182,12 +186,13 @@ export function tasksReducer(tasks, action) {
  *
  * Returns `{ tasks, persistFailed, addTask, toggleTask, deleteTask,
  * insertTask, editTask, addSubtask, toggleSubtask, deleteSubtask,
- * editSubtask, clearCompleted }`.
+ * editSubtask, clearCompleted, replaceTasks }`.
  * `addSubtask` returns the id of the created subtask so callers can move
  * focus to it after it has rendered. `persistFailed` is true after a
  * persistence attempt could not write to storage (quota exceeded,
  * private‑browsing mode, …) so the UI can warn the user. `insertTask`
  * re‑adds a task at a given position (used for "undo delete").
+ * `replaceTasks` swaps the whole list for a normalized one (JSON import).
  */
 export function useTasks() {
   // Lazy initializer: the stored list is read exactly once, before the first
@@ -273,5 +278,8 @@ export function useTasks() {
         description: description.trim(),
       }),
     clearCompleted: () => dispatch({ type: 'clear-completed' }),
+    // Swap the whole list for an already normalized one (JSON import).
+    replaceTasks: (nextTasks) =>
+      dispatch({ type: 'replace-tasks', tasks: nextTasks }),
   };
 }

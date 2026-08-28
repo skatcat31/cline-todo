@@ -3,9 +3,13 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import AddCircleOutline from '@mui/icons-material/AddCircleOutline';
+import EditOutlined from '@mui/icons-material/EditOutlined';
+import DeleteOutline from '@mui/icons-material/DeleteOutline';
 import SubtaskItem from './SubtaskItem.jsx';
 
 /**
@@ -59,35 +63,68 @@ export default function TaskItem({
   };
 
   return (
-    <Box component="li" aria-labelledby={`task-title-${task.id}`} sx={{ mb: 2 }}>
-      <Box display="flex" alignItems="center">
+    <Box component="li" aria-labelledby={`task-title-${task.id}`} sx={{ px: 2, py: 2 }}>
+      {/* Row: checkbox + primary/secondary text (Material list item pattern) */}
+      <Box display="flex" alignItems="flex-start" gap={1}>
         <Checkbox
           id={`done-${task.id}`}
           checked={task.done}
           onChange={() => toggleDone(task.id)}
           inputProps={{ 'aria-labelledby': `task-title-${task.id}` }}
+          sx={{ mt: -0.5 }}
         />
-        <Typography
-          id={`task-title-${task.id}`}
-          component="span"
-          variant="h6"
-          sx={{ textDecoration: task.done ? 'line-through' : 'none' }}
-        >
-          {task.title}
-        </Typography>
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Typography
+            id={`task-title-${task.id}`}
+            component="span"
+            variant="subtitle1"
+            sx={{ textDecoration: task.done ? 'line-through' : 'none' }}
+          >
+            {task.title}
+          </Typography>
+          {task.description && (
+            <Typography
+              id={`task-desc-${task.id}`}
+              variant="body2"
+              color="text.secondary"
+              sx={{ textDecoration: task.done ? 'line-through' : 'none' }}
+            >
+              {task.description}
+            </Typography>
+          )}
+        </Box>
       </Box>
-      {task.description && (
-        <Typography
-          id={`task-desc-${task.id}`}
-          variant="body2"
-          sx={{ ml: 4, textDecoration: task.done ? 'line-through' : 'none' }}
+
+      {/* Action row: Material icon buttons for adding a subtask, editing and deleting */}
+      <Box
+        display="flex"
+        alignItems="center"
+        gap={0.5}
+        sx={{ pl: 5, mt: 0.5 }}
+      >
+        <IconButton
+          size="small"
+          aria-label="Add subtask"
+          onClick={() => setSubtaskParentId(task.id)}
         >
-          {task.description}
-        </Typography>
-      )}
+          <AddCircleOutline fontSize="small" />
+        </IconButton>
+        <IconButton size="small" aria-label="Edit task" onClick={startEdit}>
+          <EditOutlined fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          aria-label="Delete task"
+          color="error"
+          onClick={() => deleteTask(task.id)}
+        >
+          <DeleteOutline fontSize="small" />
+        </IconButton>
+      </Box>
+
       {/* Edit form (shown only while editing this task) */}
       {isEditing && (
-        <Box component="form" onSubmit={saveEdit} sx={{ mt: 1, ml: 4 }}>
+        <Box component="form" onSubmit={saveEdit} sx={{ mt: 1, pl: 5 }}>
           <TextField
             id={`edit-title-${task.id}`}
             label="Edit Title"
@@ -105,7 +142,7 @@ export default function TaskItem({
             fullWidth
             margin="normal"
           />
-          <Button type="submit" variant="contained" sx={{ mt: 1 }}>
+          <Button type="submit" variant="contained" size="small" sx={{ mt: 1 }}>
             Save Task
           </Button>
           <Button type="button" onClick={cancelEdit} sx={{ mt: 1 }}>
@@ -115,7 +152,7 @@ export default function TaskItem({
       )}
       {/* Subtasks */}
       {task.subtasks && task.subtasks.length > 0 && (
-        <List component="ul" disablePadding sx={{ pl: 2, mt: 1 }}>
+        <List component="ul" disablePadding sx={{ pl: 5, mt: 1 }}>
           {task.subtasks.map((sub) => (
             <SubtaskItem
               key={sub.id}
@@ -129,19 +166,9 @@ export default function TaskItem({
           ))}
         </List>
       )}
-      {/* Buttons to add a subtask or delete this task */}
-      <Button type="button" onClick={() => setSubtaskParentId(task.id)} sx={{ mt: 1 }}>
-        Add Subtask
-      </Button>
-      <Button type="button" onClick={startEdit} sx={{ mt: 1 }}>
-        Edit Task
-      </Button>
-      <Button type="button" color="error" onClick={() => deleteTask(task.id)} sx={{ mt: 1 }}>
-        Delete Task
-      </Button>
       {/* Subtask entry form (shown only for the selected parent) */}
       {subtaskParentId === task.id && (
-        <Box component="form" onSubmit={handleAddSubtask} sx={{ mt: 1 }}>
+        <Box component="form" onSubmit={handleAddSubtask} sx={{ mt: 1, pl: 5 }}>
           <TextField
             id="subtask-title"
             label="Subtask Title"
@@ -163,12 +190,15 @@ export default function TaskItem({
             fullWidth
             margin="normal"
           />
-          <Button type="submit" variant="contained" sx={{ mt: 1 }}>
+          <Button type="submit" variant="contained" size="small" sx={{ mt: 1 }}>
             Add Subtask
           </Button>
         </Box>
       )}
-      <Divider sx={{ my: 2 }} />
+      {/* Material list divider between tasks (negative margin to bleed
+          to the card edges) */}
+      <Divider sx={{ mx: -2 }} />
     </Box>
   );
 }
+

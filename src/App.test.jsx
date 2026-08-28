@@ -1023,3 +1023,45 @@ test('rejects files that are not a valid task list', async () => {
   expect(await screen.findByText(/import failed/i)).toBeInTheDocument();
   expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument();
 });
+
+/**
+ * The app bar offers a light/dark toggle; the choice is persisted so a
+ * "reload" keeps the selected color scheme.
+ */
+test('toggles the theme and persists the choice', async () => {
+  render(<App />);
+  const toggle = screen.getByRole('button', { name: 'Switch to dark mode' });
+  await userEvent.click(toggle);
+
+  expect(
+    screen.getByRole('button', { name: 'Switch to light mode' }),
+  ).toBeInTheDocument();
+  expect(localStorage.getItem('todo-theme')).toBe('dark');
+});
+
+/**
+ * An explicitly stored theme preference wins over the OS preference.
+ */
+test('uses the stored theme preference', () => {
+  localStorage.setItem('todo-theme', 'dark');
+  render(<App />);
+  expect(
+    screen.getByRole('button', { name: 'Switch to light mode' }),
+  ).toBeInTheDocument();
+});
+
+/**
+ * Without a stored preference the app follows the OS color-scheme setting.
+ */
+test('defaults to dark when the system prefers dark', () => {
+  const originalMatchMedia = window.matchMedia;
+  window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+  try {
+    render(<App />);
+    expect(
+      screen.getByRole('button', { name: 'Switch to light mode' }),
+    ).toBeInTheDocument();
+  } finally {
+    window.matchMedia = originalMatchMedia;
+  }
+});

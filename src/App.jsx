@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -25,6 +25,7 @@ function App() {
     addTask,
     toggleTask,
     deleteTask,
+    insertTask,
     editTask,
     addSubtask,
     toggleSubtask,
@@ -37,6 +38,12 @@ function App() {
   const [description, setDescription] = useState('');
   // Which list to show: "all", "active" or "completed"
   const [filter, setFilter] = useState('all');
+  // The most recently deleted task plus its position, so a delete can be
+  // undone from the snackbar. `null` means there is nothing to undo.
+  const [deletedTask, setDeletedTask] = useState(null);
+  // Ref to the new‑task title field so focus can fall back to it when the
+  // whole list becomes empty after a delete.
+  const titleInputRef = useRef(null);
 
   // Handle adding a new top‑level task
   const handleAddTask = (e) => {
@@ -46,6 +53,32 @@ function App() {
     setTitle('');
     setDescription('');
   };
+
+  // Delete a task but remember it (with its position) so the snackbar can
+  // offer an undo. Also keeps keyboard focus inside the list: it moves to
+  // the task that now occupies the deleted task's position, or to the
+  // new‑task title field when the list becomes empty.
+  const handleDeleteTask = (id) => {
+    const index = tasks.findIndex((task) => task.id === id);
+    const task = tasks[index];
+    const remaining = tasks.filter((t) => t.id !== id);
+    deleteTask(id);
+    setDeletedTask({ task, index });
+    const target = remaining[Math.min(index, remaining.length - 1)];
+    const targetElement = target
+      ? document.getElementById(`done-${target.id}`)
+      : null;
+    (targetElement ?? titleInputRef.current)?.focus();
+  };
+
+  // Re‑insert the deleted task at its original position.
+  const handleUndoDelete = () => {
+    if (!deletedTask) return;
+    insertTask(deletedTask.task, deletedTask.index);
+    setDeletedTask(null);
+  };
+
+  const closeUndoSnackbar = () => setDeletedTask(null);
 
   // The task list as shown by the active filter
   const visibleTasks =
@@ -89,6 +122,7 @@ function App() {
                 required
                 fullWidth
                 margin="normal"
+                inputRef={titleInputRef}
               />
               <TextField
                 id="description"
@@ -177,7 +211,7 @@ function App() {
                   key={task.id}
                   task={task}
                   onToggleDone={toggleTask}
-                  onDelete={deleteTask}
+                  onDelete={handleDeleteTask}
                   onEdit={editTask}
                   onAddSubtask={addSubtask}
                   onToggleSubtask={toggleSubtask}
@@ -189,6 +223,30 @@ function App() {
           </Card>
         )}
       </Box>
+
+      {/* Undo prompt after a task was deleted: the task (and its position)
+          are kept in state and re‑inserted when "Undo" is pressed. The
+          snackbar auto‑disappears after a few seconds. */}
+      <Snackbar
+        open={Boolean(deletedTask)}
+        autoHideDuration={6000}
+        onClose={closeUndoSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{ mb: 2 }}
+      >
+        <Alert
+          severity="info"
+          variant="filled"
+          onClose={closeUndoSnackbar}
+          action={
+            <Button color="inherit" size="small" onClick={handleUndoDelete}>
+              Undo
+            </Button>
+          }
+        >
+          {deletedTask ? `Deleted "${deletedTask.task.title}"` : ''}
+        </Alert>
+      </Snackbar>
 
       {/* Warning shown while a persistence attempt has failed (storage full
           or unavailable): the list still works, but changes may not survive

@@ -109,8 +109,17 @@ export default function SubtaskItem({
           <DeleteOutline fontSize="small" />
         </IconButton>
       </Box>
+      {/* Inline edit form. Escape cancels; the title field receives focus
+          when the form opens. */}
       {isEditing && (
-        <Box component="form" onSubmit={saveEdit} sx={{ ml: 4, mt: 1 }}>
+        <Box
+          component="form"
+          onSubmit={saveEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') cancelEdit();
+          }}
+          sx={{ ml: 4, mt: 1 }}
+        >
           <TextField
             id={`edit-subtitle-${sub.id}`}
             label="Edit Subtask Title"
@@ -119,6 +128,7 @@ export default function SubtaskItem({
             required
             fullWidth
             margin="normal"
+            autoFocus
           />
           <TextField
             id={`edit-subdesc-${sub.id}`}

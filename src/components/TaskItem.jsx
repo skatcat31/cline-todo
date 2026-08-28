@@ -127,9 +127,17 @@ export default function TaskItem({
         </IconButton>
       </Box>
 
-      {/* Edit form (shown only while editing this task) */}
+      {/* Edit form (shown only while editing this task). Escape cancels the
+          edit; the title field receives focus when the form opens. */}
       {isEditing && (
-        <Box component="form" onSubmit={saveEdit} sx={{ mt: 1, pl: 5 }}>
+        <Box
+          component="form"
+          onSubmit={saveEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') cancelEdit();
+          }}
+          sx={{ mt: 1, pl: 5 }}
+        >
           <TextField
             id={`edit-title-${task.id}`}
             label="Edit Title"
@@ -138,6 +146,7 @@ export default function TaskItem({
             required
             fullWidth
             margin="normal"
+            autoFocus
           />
           <TextField
             id={`edit-desc-${task.id}`}

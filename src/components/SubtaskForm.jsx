@@ -28,7 +28,14 @@ export default function SubtaskForm({ idPrefix = '', onSubmit, onCancel }) {
   const fieldId = (suffix) => (idPrefix ? `${idPrefix}-${suffix}` : suffix);
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, pl: 5 }}>
+    <Box
+      component="form"
+      onSubmit={handleSubmit}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onCancel();
+      }}
+      sx={{ mt: 1, pl: 5 }}
+    >
       <TextField
         id={fieldId('subtask-title')}
         label="Subtask Title"
@@ -38,6 +45,7 @@ export default function SubtaskForm({ idPrefix = '', onSubmit, onCancel }) {
         required
         fullWidth
         margin="normal"
+        autoFocus
       />
       <TextField
         id={fieldId('subtask-desc')}

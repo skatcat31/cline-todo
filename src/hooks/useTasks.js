@@ -103,6 +103,14 @@ export function tasksReducer(tasks, action) {
       );
     case 'delete-task':
       return tasks.filter((t) => t.id !== action.id);
+    case 'insert-task': {
+      // Re‑insert a task at a given position (used by "undo delete"). The
+      // index is clamped so stale positions never drop or corrupt the list.
+      const next = [...tasks];
+      const index = Math.max(0, Math.min(action.index, next.length));
+      next.splice(index, 0, action.task);
+      return next;
+    }
     case 'edit-task':
       return tasks.map((t) =>
         t.id === action.id
@@ -173,11 +181,13 @@ export function tasksReducer(tasks, action) {
  * persistence (lazy load before the first render, save on every change).
  *
  * Returns `{ tasks, persistFailed, addTask, toggleTask, deleteTask,
- * editTask, addSubtask, toggleSubtask, deleteSubtask, editSubtask }`.
+ * insertTask, editTask, addSubtask, toggleSubtask, deleteSubtask,
+ * editSubtask, clearCompleted }`.
  * `addSubtask` returns the id of the created subtask so callers can move
  * focus to it after it has rendered. `persistFailed` is true after a
  * persistence attempt could not write to storage (quota exceeded,
- * private‑browsing mode, …) so the UI can warn the user.
+ * private‑browsing mode, …) so the UI can warn the user. `insertTask`
+ * re‑adds a task at a given position (used for "undo delete").
  */
 export function useTasks() {
   // Lazy initializer: the stored list is read exactly once, before the first
@@ -229,6 +239,9 @@ export function useTasks() {
       }),
     toggleTask: (id) => dispatch({ type: 'toggle-task', id }),
     deleteTask: (id) => dispatch({ type: 'delete-task', id }),
+    // Re‑add a (previously deleted) task at a given position for "undo".
+    insertTask: (task, index) =>
+      dispatch({ type: 'insert-task', task, index: index ?? 0 }),
     editTask: (id, { title, description }) =>
       dispatch({
         type: 'edit-task',

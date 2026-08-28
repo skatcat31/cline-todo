@@ -288,6 +288,26 @@ describe('useTasks', () => {
     });
   });
 
+  test('insertTask re‑adds a task at a given position', () => {
+    const { result } = renderHook(() => useTasks());
+    let taskA;
+    act(() => {
+      result.current.addTask('Task A', '');
+      result.current.addTask('Task B', '');
+    });
+    [taskA] = result.current.tasks;
+    act(() => {
+      result.current.deleteTask(taskA.id);
+    });
+    act(() => {
+      result.current.insertTask(taskA, 0);
+    });
+    expect(result.current.tasks.map((t) => t.title)).toEqual([
+      'Task A',
+      'Task B',
+    ]);
+  });
+
   test('clearCompleted removes only the completed tasks', () => {
     const { result } = renderHook(() => useTasks());
     act(() => {
@@ -310,6 +330,44 @@ describe('tasksReducer', () => {
   test('ignores unknown actions and returns the state untouched', () => {
     const tasks = [{ id: 'a', title: 'A', done: false, subtasks: [] }];
     expect(tasksReducer(tasks, { type: 'unknown' })).toBe(tasks);
+  });
+
+  test('insert-task places the task at the given index without mutating', () => {
+    const existing = [
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+    ];
+    const inserted = { id: 'x', title: 'X', done: false, subtasks: [] };
+    const after = tasksReducer(existing, {
+      type: 'insert-task',
+      task: inserted,
+      index: 1,
+    });
+    expect(after.map((t) => t.id)).toEqual(['a', 'x', 'b']);
+    // The previous state array must not have been mutated.
+    expect(existing.map((t) => t.id)).toEqual(['a', 'b']);
+  });
+
+  test('insert-task clamps out‑of‑range indices instead of corrupting', () => {
+    const existing = [
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+    ];
+    const inserted = { id: 'x', title: 'X', done: false, subtasks: [] };
+    expect(
+      tasksReducer(existing, {
+        type: 'insert-task',
+        task: inserted,
+        index: 99,
+      }).map((t) => t.id),
+    ).toEqual(['a', 'b', 'x']);
+    expect(
+      tasksReducer(existing, {
+        type: 'insert-task',
+        task: inserted,
+        index: -3,
+      }).map((t) => t.id),
+    ).toEqual(['x', 'a', 'b']);
   });
 });
 

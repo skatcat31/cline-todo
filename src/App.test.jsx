@@ -797,3 +797,99 @@ test('warns while tasks cannot be persisted', async () => {
     errorSpy.mockRestore();
   }
 });
+
+/**
+ * Deleting a task offers an undo: the snackbar action re‑inserts the task
+ * at its original position.
+ */
+test('undo restores a deleted task at its original position', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  const itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Delete task' }),
+  );
+  expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+
+  await userEvent.click(await screen.findByRole('button', { name: /^undo$/i }));
+  expect(screen.getByText('Task A')).toBeInTheDocument();
+  // The task must be back at its original position (before Task B).
+  const items = screen.getAllByRole('listitem');
+  expect(items[0]).toHaveAccessibleName('Task A');
+  expect(items[1]).toHaveAccessibleName('Task B');
+});
+
+/**
+ * Deleting a task must not leave the keyboard focus on a removed element:
+ * it moves to the task that now occupies the deleted task's position.
+ */
+test('keeps focus inside the list after deleting a task', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  const itemB = screen.getByRole('listitem', { name: 'Task B' });
+  await userEvent.click(
+    within(itemB).getByRole('button', { name: 'Delete task' }),
+  );
+  await waitFor(() => {
+    expect(screen.getByRole('checkbox', { name: 'Task A' })).toHaveFocus();
+  });
+});
+
+/**
+ * Escape cancels the task edit form without saving (the title field is
+ * focused when the form opens, so the key reaches the form's handler).
+ */
+test('Escape closes the task edit form', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  const itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Edit task' }),
+  );
+  const editTitle = screen.getByLabelText(/^edit title/i);
+  expect(editTitle).toHaveFocus();
+
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByLabelText(/^edit title/i)).not.toBeInTheDocument();
+  // The original title must be untouched.
+  expect(screen.getByText('Task A')).toBeInTheDocument();
+});
+
+/**
+ * Escape closes the "add subtask" form without creating a subtask.
+ */
+test('Escape closes the subtask form', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  const itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Add subtask' }),
+  );
+  const subTitle = screen.getByLabelText(/subtask title/i);
+  expect(subTitle).toHaveFocus();
+
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByLabelText(/subtask title/i)).not.toBeInTheDocument();
+  // No subtask must have been created.
+  expect(
+    screen.queryByRole('checkbox', { name: /sub/i }),
+  ).not.toBeInTheDocument();
+});

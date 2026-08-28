@@ -6,20 +6,27 @@ browser's `localStorage`.
 
 ## Features
 
-- Add, edit and delete tasks with optional descriptions
-- Add, edit, complete and delete nested subtasks
-- Filter the list by status (All / Active / Completed) with an active-task
-  counter and a "clear completed" action
-- Automatic persistence to `localStorage`
-- Accessible Material Design UI (keyboard focus management,
-  screen‑reader labels)
+- Add, edit and delete tasks with optional descriptions – deletions offer an
+  "Undo" snackbar
+- Add, edit, complete and delete nested subtasks, with per‑task progress
+  ("2 of 5 subtasks done")
+- Filter the list by status (All / Active / Completed) – the selection is
+  remembered across reloads – with an active‑task counter and a "clear
+  completed" action
+- Automatic persistence to `localStorage`, including cross‑tab sync
+- Export / import the task list as a JSON file
+- Light / dark color scheme: app‑bar toggle, persisted choice, follows the
+  OS preference on first visit
+- Progressive Web App: installable and fully usable offline
+- Accessible Material Design UI (keyboard focus management, screen‑reader
+  labels, Escape closes inline forms)
 
 ## Tech stack
 
 | Concern     | Choice                                                     |
 | ----------- | ---------------------------------------------------------- |
 | UI          | React 19, MUI 5 (direct‑path imports), Emotion             |
-| Build       | Vite 8                                                     |
+| Build       | Vite 8, PWA via vite‑plugin‑pwa                            |
 | Tests       | Vitest 4, Testing Library, jsdom (80% coverage thresholds) |
 | Lint/format | ESLint 9 (flat config), Prettier                           |
 | CI/CD       | GitHub Actions → GitHub Pages                              |
@@ -52,26 +59,35 @@ Coverage is enforced at 80% (statements, branches, functions and lines) in
 
 ```
 src/
-  App.jsx              App shell: new‑task form + task list layout
-  main.jsx             Entry point (ThemeProvider, CssBaseline)
-  theme.js             MUI theme (Material palette, Roboto, sentence‑case buttons)
+  App.jsx              App shell: new‑task form + task list layout,
+                       filters, theme toggle, export/import, undo + warning
+                       snackbars
+  main.jsx             Entry point (mounts App behind the ErrorBoundary)
+  theme.js             createAppTheme(mode): light + dark Material themes
   hooks/
-    useTasks.js        Task state (useReducer) + mutations + localStorage persistence
+    useTasks.js        Task state (useReducer) + mutations + localStorage
+                       persistence (lazy load, cross‑tab sync)
   components/
-    TaskItem.jsx       One task row, its edit form and subtask management
+    TaskItem.jsx       One task row, its edit form, subtask progress and
+                       subtask management
     SubtaskItem.jsx    One subtask row with an inline edit form
     SubtaskForm.jsx    Inline "add subtask" form (owns its draft state)
     Placeholder.jsx    Empty state
+    ErrorBoundary.jsx  Last‑resort crash UI with a reload button
+  utils/
+    taskFile.js        JSON export/import helpers (serialize, download,
+                       parse + validate)
   test/
-    setup.js           Vitest setup (localStorage polyfill, per‑test isolation)
+    setup.js           Vitest setup (localStorage polyfill, per‑test
+                       isolation, RTL cleanup)
 ```
 
 ## Deployment
 
 - **GitHub Pages** – pushing to `main` runs the CI workflow
-  (`.github/workflows/ci.yml`): lint, test with coverage, build, then deploy
-  `dist/` to GitHub Pages. The Vite `base` is derived from
-  `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path.
+  (`.github/workflows/ci.yml`): lint, format check, test with coverage,
+  build, then deploy `dist/` to GitHub Pages. The Vite `base` is derived
+  from `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path.
 - **Docker** – a multi‑stage build compiles the site with Node and serves it
   with nginx:
 

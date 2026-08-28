@@ -21,9 +21,7 @@ const theme = createTheme({
   },
   typography: {
     // Roboto is the Material Design typeface.
-    fontFamily: ['"Roboto"', '"Helvetica"', '"Arial"', 'sans-serif'].join(
-      ','
-    ),
+    fontFamily: ['"Roboto"', '"Helvetica"', '"Arial"', 'sans-serif'].join(','),
   },
   shape: {
     // 10px corner radius for cards, buttons and text fields.

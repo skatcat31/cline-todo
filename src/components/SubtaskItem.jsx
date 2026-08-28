@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -113,7 +113,12 @@ export default function SubtaskItem({ sub, onToggle, onDelete, onEdit }) {
           <Button type="submit" size="small" variant="contained" sx={{ mt: 1 }}>
             Save Subtask
           </Button>
-          <Button type="button" size="small" onClick={cancelEdit} sx={{ mt: 1 }}>
+          <Button
+            type="button"
+            size="small"
+            onClick={cancelEdit}
+            sx={{ mt: 1 }}
+          >
             Cancel Edit
           </Button>
         </Box>

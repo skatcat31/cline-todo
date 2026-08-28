@@ -4,8 +4,7 @@
  * into a DOM element with id "root". Importing the module therefore has the
  * side‑effect of rendering the application.
  */
-import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 // Compatibility layer for jest-dom matchers with Vitest
 import '@testing-library/jest-dom/vitest';
 
@@ -19,14 +18,15 @@ beforeAll(() => {
 
 test('main renders App and shows placeholder when no tasks exist', async () => {
   // Import the side‑effectful module. This will mount <App /> into the root.
-  // The import must be inside the test to ensure the DOM is prepared.
-  await import('./main.jsx');
+  // The import must be inside the test to ensure the DOM is prepared first,
+  // and wrapped in `act` so the render it triggers is handled properly.
+  await act(async () => {
+    await import('./main.jsx');
+  });
 
   // The initial render of App shows the placeholder text when the task list
   // is empty. Verify that the placeholder appears, confirming that the render
-  // path in main.jsx (lines 5‑9) was executed.
-  // The placeholder text when there are no tasks is rendered by App.
-  // Use async query to wait for the component to render.
+  // path in main.jsx was executed.
   const placeholder = await screen.findByText('No tasks yet. Add one above!');
   expect(placeholder).toBeInTheDocument();
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -44,7 +44,7 @@ function App() {
   // Toggle the "done" state of a task
   const toggleDone = (id) => {
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
+      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)),
     );
   };
 
@@ -54,10 +54,10 @@ function App() {
       prev.map((t) => {
         if (t.id !== parentId) return t;
         const newSubs = t.subtasks.map((s) =>
-          s.id === subId ? { ...s, done: !s.done } : s
+          s.id === subId ? { ...s, done: !s.done } : s,
         );
         return { ...t, subtasks: newSubs };
-      })
+      }),
     );
   };
 
@@ -72,8 +72,8 @@ function App() {
       prev.map((t) =>
         t.id === parentId
           ? { ...t, subtasks: t.subtasks.filter((s) => s.id !== subId) }
-          : t
-      )
+          : t,
+      ),
     );
   };
 
@@ -83,8 +83,8 @@ function App() {
       prev.map((t) =>
         t.id === id
           ? { ...t, title: title.trim(), description: description.trim() }
-          : t
-      )
+          : t,
+      ),
     );
   };
 
@@ -96,13 +96,12 @@ function App() {
         const newSubs = t.subtasks.map((s) =>
           s.id === subId
             ? { ...s, title: title.trim(), description: description.trim() }
-            : s
+            : s,
         );
         return { ...t, subtasks: newSubs };
-      })
+      }),
     );
   };
-
 
   // Handle adding a subtask to the currently selected parent
   const handleAddSubtask = (e) => {
@@ -119,7 +118,7 @@ function App() {
       prev.map((t) => {
         if (t.id !== subtaskParentId) return t;
         return { ...t, subtasks: [...t.subtasks, newSub] };
-      })
+      }),
     );
     setSubtaskTitle('');
     setSubtaskDescription('');
@@ -238,4 +237,3 @@ function App() {
 }
 
 export default App;
-

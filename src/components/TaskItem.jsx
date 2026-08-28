@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -63,7 +63,11 @@ export default function TaskItem({
   };
 
   return (
-    <Box component="li" aria-labelledby={`task-title-${task.id}`} sx={{ px: 2, py: 2 }}>
+    <Box
+      component="li"
+      aria-labelledby={`task-title-${task.id}`}
+      sx={{ px: 2, py: 2 }}
+    >
       {/* Row: checkbox + primary/secondary text (Material list item pattern) */}
       <Box display="flex" alignItems="flex-start" gap={1}>
         <Checkbox
@@ -96,12 +100,7 @@ export default function TaskItem({
       </Box>
 
       {/* Action row: Material icon buttons for adding a subtask, editing and deleting */}
-      <Box
-        display="flex"
-        alignItems="center"
-        gap={0.5}
-        sx={{ pl: 5, mt: 0.5 }}
-      >
+      <Box display="flex" alignItems="center" gap={0.5} sx={{ pl: 5, mt: 0.5 }}>
         <IconButton
           size="small"
           aria-label="Add subtask"
@@ -201,4 +200,3 @@ export default function TaskItem({
     </Box>
   );
 }
-

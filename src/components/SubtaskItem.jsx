@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
+import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import EditOutlined from '@mui/icons-material/EditOutlined';
+import DeleteOutline from '@mui/icons-material/DeleteOutline';
 
 /**
  * Renders a single subtask with a checkbox, optional description and an inline edit form.
@@ -44,39 +47,49 @@ export default function SubtaskItem({ sub, onToggle, onDelete, onEdit }) {
       aria-describedby={sub.description ? subDescId : undefined}
       sx={{ mb: 1 }}
     >
-      <Box display="flex" alignItems="center">
+      {/* Row: checkbox + primary/secondary text (Material list item pattern) */}
+      <Box display="flex" alignItems="flex-start" gap={1}>
         <Checkbox
           id={subCheckboxId}
           checked={sub.done}
           onChange={onToggle}
           inputProps={{ 'aria-labelledby': subTitleId }}
+          sx={{ mt: -0.5 }}
         />
-        <Typography
-          id={subTitleId}
-          component="span"
-          variant="body1"
-          sx={{ textDecoration: sub.done ? 'line-through' : 'none' }}
-        >
-          {sub.title}
-        </Typography>
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Typography
+            id={subTitleId}
+            component="span"
+            variant="body1"
+            sx={{ textDecoration: sub.done ? 'line-through' : 'none' }}
+          >
+            {sub.title}
+          </Typography>
+          {sub.description && (
+            <Typography
+              id={subDescId}
+              variant="body2"
+              color="text.secondary"
+              sx={{ textDecoration: sub.done ? 'line-through' : 'none' }}
+            >
+              {sub.description}
+            </Typography>
+          )}
+        </Box>
       </Box>
-      {sub.description && (
-        <Typography
-          id={subDescId}
-          variant="body2"
-          sx={{ ml: 4, textDecoration: sub.done ? 'line-through' : 'none' }}
+      {/* Action buttons: Material icon buttons, aligned with the subtask's details */}
+      <Box display="flex" alignItems="center" gap={0.5} sx={{ pl: 5, mt: 0.5 }}>
+        <IconButton size="small" aria-label="Edit subtask" onClick={startEdit}>
+          <EditOutlined fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          aria-label="Delete subtask"
+          color="error"
+          onClick={onDelete}
         >
-          {sub.description}
-        </Typography>
-      )}
-      {/* Action buttons, aligned with the subtask's details */}
-      <Box display="flex" gap={1} sx={{ ml: 4 }}>
-        <Button type="button" size="small" onClick={startEdit}>
-          Edit Subtask
-        </Button>
-        <Button type="button" size="small" color="error" onClick={onDelete}>
-          Delete Subtask
-        </Button>
+          <DeleteOutline fontSize="small" />
+        </IconButton>
       </Box>
       {isEditing && (
         <Box component="form" onSubmit={saveEdit} sx={{ ml: 4, mt: 1 }}>

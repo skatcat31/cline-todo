@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
 import List from '@mui/material/List';
+import TextField from '@mui/material/TextField';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
 import Placeholder from './components/Placeholder.jsx';
 import TaskItem from './components/TaskItem.jsx';
 
@@ -99,10 +103,10 @@ function App() {
     );
   };
 
+
   // Handle adding a subtask to the currently selected parent
   const handleAddSubtask = (e) => {
     e.preventDefault();
-    if (subtaskParentId === null) return;
     if (!subtaskTitle.trim()) return;
     const newSubId = crypto.randomUUID();
     const newSub = {
@@ -149,67 +153,89 @@ function App() {
     checkbox?.focus();
     setFocusTarget(null);
   }, [focusTarget]);
-
   return (
-    <Box component="section" sx={{ p: 2, maxWidth: 600, mx: "auto" }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        To‑Do List
-      </Typography>
+    <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
+      {/* Material app bar with the application title */}
+      <AppBar position="sticky" elevation={1}>
+        <Toolbar>
+          <Typography variant="h6" component="h1" noWrap sx={{ flexGrow: 1 }}>
+            To‑Do List
+          </Typography>
+        </Toolbar>
+      </AppBar>
 
-       {/* New task entry form */}
-       <Box component="form" onSubmit={handleAddTask} sx={{ mb: 2 }}>
-          <TextField
-            id="title"
-            label="Title"
-            placeholder="Task title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            id="description"
-            label="Description"
-            placeholder="Task description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <Button type="submit" variant="contained" sx={{ mt: 1 }}
-            >Add Task</Button>
-       </Box>
+      {/* Main content surface, centered, using the 8pt spacing grid */}
+      <Box
+        component="main"
+        sx={{ maxWidth: 640, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}
+      >
+        {/* New task entry form, presented as a Material card surface */}
+        <Card elevation={2} sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" component="h2" gutterBottom>
+              New Task
+            </Typography>
+            <Box component="form" onSubmit={handleAddTask}>
+              <TextField
+                id="title"
+                label="Title"
+                placeholder="Task title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                fullWidth
+                margin="normal"
+              />
+              <TextField
+                id="description"
+                label="Description"
+                placeholder="Task description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                fullWidth
+                margin="normal"
+              />
+              <Button type="submit" variant="contained" sx={{ mt: 1 }}>
+                Add Task
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
 
-       {/* Placeholder when no tasks exist */}
-       {tasks.length === 0 && <Placeholder />}
+        {/* Placeholder when no tasks exist */}
+        {tasks.length === 0 && <Placeholder />}
 
-       {/* List of tasks */}
-       {tasks.length > 0 && (
-         <List component="ul" disablePadding>
-           {tasks.map((task) => (
-             <TaskItem
-               key={task.id}
-               task={task}
-               toggleDone={toggleDone}
-               deleteTask={deleteTask}
-               editTask={editTask}
-               toggleSubtaskDone={toggleSubtaskDone}
-               deleteSubtask={deleteSubtask}
-               editSubtask={editSubtask}
-               subtaskParentId={subtaskParentId}
-               setSubtaskParentId={setSubtaskParentId}
-               subtaskTitle={subtaskTitle}
-               setSubtaskTitle={setSubtaskTitle}
-               subtaskDescription={subtaskDescription}
-               setSubtaskDescription={setSubtaskDescription}
-               handleAddSubtask={handleAddSubtask}
-             />
-           ))}
-         </List>
+        {/* List of tasks, presented on a shared paper surface with
+            Material list dividers between items */}
+        {tasks.length > 0 && (
+          <Card elevation={1} sx={{ mb: 3 }}>
+            <List component="ul" disablePadding>
+              {tasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  toggleDone={toggleDone}
+                  deleteTask={deleteTask}
+                  editTask={editTask}
+                  toggleSubtaskDone={toggleSubtaskDone}
+                  deleteSubtask={deleteSubtask}
+                  editSubtask={editSubtask}
+                  subtaskParentId={subtaskParentId}
+                  setSubtaskParentId={setSubtaskParentId}
+                  subtaskTitle={subtaskTitle}
+                  setSubtaskTitle={setSubtaskTitle}
+                  subtaskDescription={subtaskDescription}
+                  setSubtaskDescription={setSubtaskDescription}
+                  handleAddSubtask={handleAddSubtask}
+                />
+              ))}
+            </List>
+          </Card>
         )}
       </Box>
-    );
+    </Box>
+  );
 }
 
 export default App;
+

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -15,8 +15,16 @@ import DeleteOutline from '@mui/icons-material/DeleteOutline';
  *   onToggle - callback invoked when the checkbox is toggled
  *   onDelete - callback invoked when the delete button is clicked
  *   onEdit - callback invoked when the edit form is saved (receives {title, description})
+ *   autoFocus - focus the checkbox once rendered (set by the parent for the
+ *               most recently added subtask)
  */
-export default function SubtaskItem({ sub, onToggle, onDelete, onEdit }) {
+export default function SubtaskItem({
+  sub,
+  onToggle,
+  onDelete,
+  onEdit,
+  autoFocus = false,
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const [draftDescription, setDraftDescription] = useState('');
@@ -24,6 +32,15 @@ export default function SubtaskItem({ sub, onToggle, onDelete, onEdit }) {
   const subTitleId = `sub-title-${sub.id}`;
   const subDescId = `sub-desc-${sub.id}`;
   const subCheckboxId = `sub-done-${sub.id}`;
+
+  // Focus the checkbox when this subtask is the newly added one (the parent
+  // passes `autoFocus` only for that id).
+  const checkboxRef = useRef(null);
+  useEffect(() => {
+    if (autoFocus) {
+      checkboxRef.current?.focus();
+    }
+  }, [autoFocus]);
 
   const startEdit = () => {
     setDraftTitle(sub.title);
@@ -54,6 +71,7 @@ export default function SubtaskItem({ sub, onToggle, onDelete, onEdit }) {
           checked={sub.done}
           onChange={onToggle}
           inputProps={{ 'aria-labelledby': subTitleId }}
+          inputRef={checkboxRef}
           sx={{ mt: -0.5 }}
         />
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>

@@ -65,24 +65,34 @@ behavior against a production build (`npm run test:e2e`).
 
 ```
 src/
-  App.jsx              App shell: new‑task form + task list layout,
-                       filters, theme toggle, export/import, undo + warning
-                       snackbars
+  App.jsx              App shell: task list layout, export/import, undo +
+                       import dialogs and warning snackbars; the new‑task
+                       form, filter bar and theme toggle live in
+                       components/
   main.jsx             Entry point (mounts App behind the ErrorBoundary)
   theme.js             createAppTheme(mode): light + dark Material themes
   hooks/
-    useTasks.js        Task state (useReducer) + mutations + localStorage
+    useTasks.js           Task state (useReducer) + mutations + localStorage
                        persistence (lazy load, cross‑tab sync)
+    usePersistentState.js useState mirrored into localStorage (best effort);
+                       used for the filter and the theme
   components/
     TaskItem.jsx       One task row, its edit form, subtask progress and
-                       subtask management
+                       subtask management (focusToken moves focus to its
+                       checkbox after a delete)
     SubtaskItem.jsx    One subtask row with an inline edit form
     SubtaskForm.jsx    Inline "add subtask" form (owns its draft state)
+    NewTaskForm.jsx    New‑task card form (owns its draft state)
+    FilterBar.jsx      All/Active/Completed buttons, active‑task
+                       counter, "clear completed"
+    ThemeToggle.jsx    Light/dark mode toggle for the app bar
     Placeholder.jsx    Empty state
     ErrorBoundary.jsx  Last‑resort crash UI with a reload button
   utils/
     taskFile.js        JSON export/import helpers (serialize, download,
                        parse + validate)
+    filters.js         The FILTERS list (value + label) shared by FilterBar
+                       and the app‑level filter validation
   test/
     setup.js           Vitest setup (localStorage polyfill, per‑test
                        isolation, RTL cleanup)

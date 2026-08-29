@@ -169,7 +169,7 @@ function App() {
     const file = input.files && input.files[0];
     input.value = '';
     if (!file) return;
-    let parsed = null;
+    let parsed;
     try {
       parsed = parseTasksFile(await file.text());
     } catch {

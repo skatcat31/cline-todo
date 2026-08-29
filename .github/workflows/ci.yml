@@ -90,3 +90,15 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
+
+      # Announce where the site was deployed. Uses the default *.github.io
+      # domain; update this if a custom domain is ever configured.
+      - name: Show deployed site URL
+        run: |
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY##*/}"
+          if [ "$owner" = "$repo" ]; then
+            echo "Site is live at https://$owner.github.io/"
+          else
+            echo "Site is live at https://$owner.github.io/$repo/"
+          fi

@@ -11,21 +11,26 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:watch": "vitest",
     "lint": "eslint .",
+    "icons": "node scripts/generate-icons.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
-    "@mui/icons-material": "^5.18.0",
-    "@mui/material": "^5.15.0",
+    "@fontsource/roboto": "^5.3.0",
+    "@mui/icons-material": "^7.3.11",
+    "@mui/material": "^7.3.11",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
+    "@resvg/resvg-js": "^2.6.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.6",

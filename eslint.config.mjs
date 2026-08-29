@@ -54,7 +54,13 @@ export default [
 
   // Build/tooling config runs in Node, not in the browser.
   {
-    files: ['vite.config.js', 'eslint.config.mjs'],
+    files: [
+      'vite.config.js',
+      'vite.config.test.js',
+      'playwright.config.js',
+      'eslint.config.mjs',
+      'scripts/**',
+    ],
     languageOptions: {
       globals: { ...globals.node },
     },

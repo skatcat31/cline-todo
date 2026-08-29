@@ -754,7 +754,7 @@ test('shows a hint when the active filter has no matching tasks', async () => {
  * "Clear completed" removes only the completed tasks and disappears once no
  * completed tasks remain.
  */
-test('clear completed removes only the completed tasks', async () => {
+test('clear completed removes only the completed tasks and offers undo', async () => {
   render(<App />);
   const titleInput = screen.getByLabelText(/^title/i);
   const addTaskBtn = screen.getByRole('button', { name: /add task/i });
@@ -763,17 +763,27 @@ test('clear completed removes only the completed tasks', async () => {
   await userEvent.type(titleInput, 'Task B');
   await userEvent.click(addTaskBtn);
 
-  // Complete the first task – the "Clear completed" button appears
+  // Complete both tasks – the "Clear completed" button appears
   await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task B' }));
   const clearBtn = screen.getByRole('button', { name: /clear completed/i });
   await userEvent.click(clearBtn);
 
   expect(screen.queryByText('Task A')).not.toBeInTheDocument();
-  expect(screen.getByText('Task B')).toBeInTheDocument();
+  expect(screen.queryByText('Task B')).not.toBeInTheDocument();
   // No completed tasks left -> the button is gone
   expect(
     screen.queryByRole('button', { name: /clear completed/i }),
   ).not.toBeInTheDocument();
+  // The snackbar reports how many tasks were cleared and offers an undo
+  expect(await screen.findByText('Deleted 2 tasks')).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: /^undo$/i }));
+  // Both tasks are back, in their original order
+  const items = screen.getAllByRole('listitem');
+  expect(items).toHaveLength(2);
+  expect(items[0]).toHaveAccessibleName('Task A');
+  expect(items[1]).toHaveAccessibleName('Task B');
 });
 
 /**
@@ -816,6 +826,8 @@ test('undo restores a deleted task at its original position', async () => {
     within(itemA).getByRole('button', { name: 'Delete task' }),
   );
   expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+  // The snackbar names the deleted task and offers an undo
+  expect(await screen.findByText('Deleted "Task A"')).toBeInTheDocument();
 
   await userEvent.click(await screen.findByRole('button', { name: /^undo$/i }));
   expect(screen.getByText('Task A')).toBeInTheDocument();
@@ -988,12 +1000,11 @@ test('exports the task list as a JSON file', async () => {
 });
 
 /**
- * "Import tasks" replaces the current list with the (normalized) contents of
- * the chosen JSON file.
+ * Importing into a non‑empty list asks for confirmation: the user can
+ * replace the list, merge the import into it, or cancel.
  */
-test('imports tasks from a JSON file', async () => {
+test('import into a non‑empty list asks for confirmation and replaces on confirm', async () => {
   render(<App />);
-  // Pre‑populate so the test proves the import *replaces* the list.
   const titleInput = screen.getByLabelText(/^title/i);
   await userEvent.type(titleInput, 'Existing');
   await userEvent.click(screen.getByRole('button', { name: /add task/i }));
@@ -1005,8 +1016,92 @@ test('imports tasks from a JSON file', async () => {
   );
   await userEvent.upload(document.querySelector('input[type="file"]'), file);
 
+  // The list is not replaced until the user confirms
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByText('Existing')).toBeInTheDocument();
+  expect(screen.queryByText('Imported')).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: /replace list/i }));
   expect(await screen.findByText('Imported')).toBeInTheDocument();
   expect(screen.queryByText('Existing')).not.toBeInTheDocument();
+  // The confirmation dialog has closed
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+test('import into an empty list replaces without confirmation', async () => {
+  render(<App />);
+  const file = new File(
+    [JSON.stringify([{ id: 'i1', title: 'Imported', done: false }])],
+    'tasks.json',
+    { type: 'application/json' },
+  );
+  await userEvent.upload(document.querySelector('input[type="file"]'), file);
+
+  expect(await screen.findByText('Imported')).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('import merging keeps existing tasks and adds the new ones', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Existing');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+  // Read the generated id so the file can include a duplicate on purpose.
+  const existingId = JSON.parse(localStorage.getItem('tasks'))[0].id;
+
+  const file = new File(
+    [
+      JSON.stringify([
+        { id: existingId, title: 'Duplicate', done: false },
+        { id: 'i2', title: 'New from file', done: false },
+      ]),
+    ],
+    'tasks.json',
+    { type: 'application/json' },
+  );
+  await userEvent.upload(document.querySelector('input[type="file"]'), file);
+
+  await userEvent.click(
+    await screen.findByRole('button', { name: /merge into list/i }),
+  );
+  // The confirmation dialog has closed
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  // The existing task is kept (its id wins), the duplicate is skipped
+  // and the new task is appended.
+  expect(screen.getByText('Existing')).toBeInTheDocument();
+  expect(screen.queryByText('Duplicate')).not.toBeInTheDocument();
+  expect(screen.getByText('New from file')).toBeInTheDocument();
+  expect(screen.getAllByRole('listitem')).toHaveLength(2);
+});
+
+test('import cancel keeps the current list untouched', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Existing');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  const file = new File(
+    [JSON.stringify([{ id: 'i1', title: 'Imported', done: false }])],
+    'tasks.json',
+    { type: 'application/json' },
+  );
+  await userEvent.upload(document.querySelector('input[type="file"]'), file);
+
+  await userEvent.click(
+    await screen.findByRole('button', { name: /^cancel$/i }),
+  );
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  expect(screen.queryByText('Imported')).not.toBeInTheDocument();
+  expect(screen.getByText('Existing')).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
 /**

@@ -7,3 +7,7 @@ npm-debug.log
 # Previously this line ignored them, which prevented the Vite config from being
 # tracked and caused CI builds to miss required settings.
 coverage/
+
+# Playwright test artifacts (screenshots, traces, error contexts)
+test-results/
+playwright-report/

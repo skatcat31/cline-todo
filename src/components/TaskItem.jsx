@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -27,6 +27,10 @@ import SubtaskForm from './SubtaskForm.jsx';
  *   onToggleSubtask - toggles a subtask's done state (receives parent and subtask ids)
  *   onDeleteSubtask - deletes a subtask (receives parent and subtask ids)
  *   onEditSubtask - updates a subtask (receives parent, subtask id and {title, description})
+ *   focusToken - a changing, non-null token that moves focus to this
+ *                task's checkbox (the parent sets it for the task that
+ *                now occupies a just-deleted task's position; a token
+ *                rather than a boolean so repeat deletes re-trigger it)
  */
 export default function TaskItem({
   task,
@@ -37,6 +41,7 @@ export default function TaskItem({
   onToggleSubtask,
   onDeleteSubtask,
   onEditSubtask,
+  focusToken = null,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
@@ -45,6 +50,14 @@ export default function TaskItem({
   const [subtaskFormOpen, setSubtaskFormOpen] = useState(false);
   // Id of the subtask that should receive focus after it has been added.
   const [focusSubId, setFocusSubId] = useState(null);
+  // Checkbox ref: used to move focus to this task when the parent sets
+  // focusToken (after a neighbouring task was deleted).
+  const checkboxRef = useRef(null);
+  useEffect(() => {
+    if (focusToken) {
+      checkboxRef.current?.focus();
+    }
+  }, [focusToken]);
 
   const startEdit = () => {
     setDraftTitle(task.title);
@@ -81,6 +94,7 @@ export default function TaskItem({
           checked={task.done}
           onChange={() => onToggleDone(task.id)}
           inputProps={{ 'aria-labelledby': `task-title-${task.id}` }}
+          inputRef={checkboxRef}
           sx={{ mt: -0.5 }}
         />
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>

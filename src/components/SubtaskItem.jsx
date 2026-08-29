@@ -6,7 +6,7 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import EditOutlined from '@mui/icons-material/EditOutlined';
-import DeleteOutline from '@mui/icons-material/DeleteOutline';
+import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
 
 /**
  * Renders a single subtask with a checkbox, optional description and an inline edit form.
@@ -65,13 +65,14 @@ export default function SubtaskItem({
       sx={{ mb: 1 }}
     >
       {/* Row: checkbox + primary/secondary text (Material list item pattern) */}
-      <Box display="flex" alignItems="flex-start" gap={1}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
         <Checkbox
           id={subCheckboxId}
           checked={sub.done}
           onChange={onToggle}
-          inputProps={{ 'aria-labelledby': subTitleId }}
-          inputRef={checkboxRef}
+          slotProps={{
+            input: { 'aria-labelledby': subTitleId, ref: checkboxRef },
+          }}
           sx={{ mt: -0.5 }}
         />
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -96,7 +97,9 @@ export default function SubtaskItem({
         </Box>
       </Box>
       {/* Action buttons: Material icon buttons, aligned with the subtask's details */}
-      <Box display="flex" alignItems="center" gap={0.5} sx={{ pl: 5, mt: 0.5 }}>
+      <Box
+        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 5, mt: 0.5 }}
+      >
         <IconButton size="small" aria-label="Edit subtask" onClick={startEdit}>
           <EditOutlined fontSize="small" />
         </IconButton>
@@ -106,7 +109,7 @@ export default function SubtaskItem({
           color="error"
           onClick={onDelete}
         >
-          <DeleteOutline fontSize="small" />
+          <DeleteOutlined fontSize="small" />
         </IconButton>
       </Box>
       {/* Inline edit form. Escape cancels; the title field receives focus

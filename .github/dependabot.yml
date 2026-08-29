@@ -1,0 +1,14 @@
+# Keep dependencies (npm) and GitHub Actions current. Dependabot opens a
+# pull request for each update; the usual CI (lint, tests, coverage, e2e,
+# build) runs on those PRs before merging.
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'

@@ -91,15 +91,16 @@ src/
 ## Deployment
 
 - **GitHub Pages** – pushing to `main` runs the CI workflow
-  (`.github/workflows/ci.yml`): lint, format check, test with coverage,
-  build, then deploy `dist/` to GitHub Pages. The Vite `base` is derived
-  from `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path.
-- **Docker** – a multi‑stage build compiles the site with Node and serves it
-  with nginx:
+  (`.github/workflows/ci.yml`): a `ci` job (lint, format check, test with
+  coverage, build), an `e2e` job (Playwright) and a `deploy` job that
+  publishes `dist/` to GitHub Pages. The Vite `base` is derived from
+  `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path.
+- **Docker** – a multi‑stage build compiles the site with Node and serves
+  it with nginx (running as the unprivileged `nginx` user on port 8080):
 
   ```sh
   docker build -t agentic-todo .
-  docker run -p 8080:80 agentic-todo
+  docker run -p 8080:8080 agentic-todo
   ```
 
 ## Node version

@@ -4,17 +4,16 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
-  # Allow manual triggering of the workflow from the GitHub UI
-  workflow_dispatch:
 
-# Cancel a superseded run for the same branch/PR instead of queueing it.
+# Cancel superseded runs for the same branch/PR
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  # Lint, format check, unit tests (with coverage gate) and the production
+  # build. The built app is published as an artifact for the deploy job.
+  ci:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -32,21 +31,20 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Check formatting
+      - name: Check code formatting
         run: npm run format:check
 
       - name: Run tests with coverage
         run: npm test -- --coverage
 
-      - name: Build site
+      - name: Build for production
         run: npm run build
 
-      - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v4.1.0
+      - name: Upload built app
+        uses: actions/upload-artifact@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          name: dist
+          path: dist
 
   # End-to-end tests (Playwright) against a production build, covering the
   # core user flows and the PWA service worker / offline behavior.
@@ -70,3 +68,25 @@ jobs:
 
       - name: Run end-to-end tests
         run: npx playwright test
+
+  # Publish the built app to GitHub Pages (main branch only). The gh-pages
+  # branch is the Pages source for this repository.
+  deploy:
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Download built app
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4.1.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist

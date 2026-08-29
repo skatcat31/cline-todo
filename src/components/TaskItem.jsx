@@ -7,9 +7,9 @@ import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import AddCircleOutline from '@mui/icons-material/AddCircleOutline';
+import AddCircleOutlined from '@mui/icons-material/AddCircleOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
-import DeleteOutline from '@mui/icons-material/DeleteOutline';
+import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
 import SubtaskItem from './SubtaskItem.jsx';
 import SubtaskForm from './SubtaskForm.jsx';
 
@@ -88,13 +88,17 @@ export default function TaskItem({
       sx={{ px: 2, py: 2 }}
     >
       {/* Row: checkbox + primary/secondary text (Material list item pattern) */}
-      <Box display="flex" alignItems="flex-start" gap={1}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
         <Checkbox
           id={`done-${task.id}`}
           checked={task.done}
           onChange={() => onToggleDone(task.id)}
-          inputProps={{ 'aria-labelledby': `task-title-${task.id}` }}
-          inputRef={checkboxRef}
+          slotProps={{
+            input: {
+              'aria-labelledby': `task-title-${task.id}`,
+              ref: checkboxRef,
+            },
+          }}
           sx={{ mt: -0.5 }}
         />
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -134,13 +138,15 @@ export default function TaskItem({
       )}
 
       {/* Action row: Material icon buttons for adding a subtask, editing and deleting */}
-      <Box display="flex" alignItems="center" gap={0.5} sx={{ pl: 5, mt: 0.5 }}>
+      <Box
+        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 5, mt: 0.5 }}
+      >
         <IconButton
           size="small"
           aria-label="Add subtask"
           onClick={() => setSubtaskFormOpen(true)}
         >
-          <AddCircleOutline fontSize="small" />
+          <AddCircleOutlined fontSize="small" />
         </IconButton>
         <IconButton size="small" aria-label="Edit task" onClick={startEdit}>
           <EditOutlined fontSize="small" />
@@ -151,7 +157,7 @@ export default function TaskItem({
           color="error"
           onClick={() => onDelete(task.id)}
         >
-          <DeleteOutline fontSize="small" />
+          <DeleteOutlined fontSize="small" />
         </IconButton>
       </Box>
 

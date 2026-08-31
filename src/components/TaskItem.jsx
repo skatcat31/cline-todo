@@ -10,6 +10,8 @@ import Typography from '@mui/material/Typography';
 import AddCircleOutlined from '@mui/icons-material/AddCircleOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
+import ArrowUpward from '@mui/icons-material/ArrowUpward';
+import ArrowDownward from '@mui/icons-material/ArrowDownward';
 import SubtaskItem from './SubtaskItem.jsx';
 import SubtaskForm from './SubtaskForm.jsx';
 
@@ -27,6 +29,10 @@ import SubtaskForm from './SubtaskForm.jsx';
  *   onToggleSubtask - toggles a subtask's done state (receives parent and subtask ids)
  *   onDeleteSubtask - deletes a subtask (receives parent and subtask ids)
  *   onEditSubtask - updates a subtask (receives parent, subtask id and {title, description})
+ *   onMoveUp - move this task one row up in the visible list
+ *   onMoveDown - move this task one row down in the visible list
+ *   canMoveUp - whether a row exists above this one (disables the up button)
+ *   canMoveDown - whether a row exists below this one (disables the down button)
  *   focusToken - a changing, non-null token that moves focus to this
  *                task's checkbox (the parent sets it for the task that
  *                now occupies a just-deleted task's position; a token
@@ -41,6 +47,10 @@ export default function TaskItem({
   onToggleSubtask,
   onDeleteSubtask,
   onEditSubtask,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
   focusToken = null,
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -137,7 +147,8 @@ export default function TaskItem({
         </Typography>
       )}
 
-      {/* Action row: Material icon buttons for adding a subtask, editing and deleting */}
+      {/* Action row: Material icon buttons for adding a subtask, editing,
+          deleting and reordering */}
       <Box
         sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 5, mt: 0.5 }}
       >
@@ -158,6 +169,22 @@ export default function TaskItem({
           onClick={() => onDelete(task.id)}
         >
           <DeleteOutlined fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          aria-label="Move task up"
+          disabled={!canMoveUp}
+          onClick={onMoveUp}
+        >
+          <ArrowUpward fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          aria-label="Move task down"
+          disabled={!canMoveDown}
+          onClick={onMoveDown}
+        >
+          <ArrowDownward fontSize="small" />
         </IconButton>
       </Box>
 

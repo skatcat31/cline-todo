@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { expect, test, vi } from 'vitest';
 import TaskItem from './TaskItem.jsx';
@@ -27,6 +28,8 @@ function renderTaskItem(props = {}) {
       onToggleSubtask={vi.fn()}
       onDeleteSubtask={vi.fn()}
       onEditSubtask={vi.fn()}
+      onMoveUp={vi.fn()}
+      onMoveDown={vi.fn()}
       {...props}
     />,
   );
@@ -78,4 +81,34 @@ test('a changed token re-triggers focus, an unchanged token does not', () => {
     />,
   );
   expect(screen.getByRole('checkbox', { name: 'Task A' })).toHaveFocus();
+});
+
+test('reports the move clicks while both directions are enabled', async () => {
+  const onMoveUp = vi.fn();
+  const onMoveDown = vi.fn();
+  renderTaskItem({
+    onMoveUp,
+    onMoveDown,
+    canMoveUp: true,
+    canMoveDown: true,
+  });
+  const up = screen.getByRole('button', { name: 'Move task up' });
+  const down = screen.getByRole('button', { name: 'Move task down' });
+  expect(up).toBeEnabled();
+  expect(down).toBeEnabled();
+  await userEvent.click(up);
+  await userEvent.click(down);
+  expect(onMoveUp).toHaveBeenCalledTimes(1);
+  expect(onMoveDown).toHaveBeenCalledTimes(1);
+});
+
+test('disables the move buttons at the list edges', () => {
+  renderTaskItem({
+    onMoveUp: vi.fn(),
+    onMoveDown: vi.fn(),
+    canMoveUp: false,
+    canMoveDown: false,
+  });
+  expect(screen.getByRole('button', { name: 'Move task up' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Move task down' })).toBeDisabled();
 });

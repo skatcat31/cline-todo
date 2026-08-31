@@ -3,6 +3,7 @@ import {
   completedItems,
   indexOfTask,
   mergeTasks,
+  tasksMatching,
   taskCounts,
   visibleTasks,
 } from './taskList.js';
@@ -94,5 +95,63 @@ describe('mergeTasks', () => {
   test('keeps the existing list untouched when the import is empty', () => {
     const merged = mergeTasks(tasks, []);
     expect(merged.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('tasksMatching', () => {
+  const searchable = [
+    {
+      id: 'a',
+      title: 'Buy milk',
+      description: 'whole milk, two liters',
+      done: false,
+      subtasks: [],
+    },
+    {
+      id: 'b',
+      title: 'Ship release',
+      description: '',
+      done: false,
+      subtasks: [
+        { id: 'b1', title: 'Write changelog', description: '', done: false },
+      ],
+    },
+    {
+      id: 'c',
+      title: 'Call dentist',
+      description: '',
+      done: false,
+      subtasks: [],
+    },
+  ];
+
+  test('matches task titles case‑insensitively', () => {
+    expect(tasksMatching(searchable, 'milk').map((t) => t.id)).toEqual(['a']);
+    expect(tasksMatching(searchable, 'MILK').map((t) => t.id)).toEqual(['a']);
+  });
+
+  test('matches task descriptions', () => {
+    expect(tasksMatching(searchable, 'two liters').map((t) => t.id)).toEqual([
+      'a',
+    ]);
+  });
+
+  test('matches subtask titles', () => {
+    expect(tasksMatching(searchable, 'changelog').map((t) => t.id)).toEqual([
+      'b',
+    ]);
+  });
+
+  test('returns every task for an empty or whitespace query', () => {
+    expect(tasksMatching(searchable, '')).toBe(searchable);
+    expect(tasksMatching(searchable, '   ').map((t) => t.id)).toEqual([
+      'a',
+      'b',
+      'c',
+    ]);
+  });
+
+  test('returns an empty list when nothing matches', () => {
+    expect(tasksMatching(searchable, 'zzz')).toEqual([]);
   });
 });

@@ -20,6 +20,7 @@ import FileUpload from '@mui/icons-material/FileUpload';
 import FilterBar from './components/FilterBar.jsx';
 import NewTaskForm from './components/NewTaskForm.jsx';
 import Placeholder from './components/Placeholder.jsx';
+import SearchBar from './components/SearchBar.jsx';
 import TaskItem from './components/TaskItem.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
 import { usePersistentState } from './hooks/usePersistentState.js';
@@ -31,6 +32,7 @@ import {
   completedItems,
   indexOfTask,
   mergeTasks,
+  tasksMatching,
   taskCounts,
   visibleTasks,
 } from './utils/taskList.js';
@@ -73,6 +75,7 @@ function App() {
     addTask,
     toggleTask,
     deleteTask,
+    moveTask,
     insertTasks,
     editTask,
     addSubtask,
@@ -93,6 +96,9 @@ function App() {
       return 'all';
     }
   });
+  // The current search query: a transient view filter (title, description
+  // or subtask title), unlike the status filter it is not persisted.
+  const [search, setSearch] = useState('');
   // Tasks (with their original positions) that can still be undone: one
   // entry per removed task, so both single deletes and "clear completed"
   // offer an undo from the snackbar. `null` means nothing to undo.
@@ -154,6 +160,18 @@ function App() {
     setPendingUndo(null);
   };
 
+  // Move a task one row up/down within the *currently visible* list (the
+  // filter may hide other tasks, so the neighbour is computed on the shown
+  // list, not the full list – the reducer swaps the two full-list entries).
+  const handleMoveTask = (id, direction) => {
+    const position = shownTasks.findIndex((task) => task.id === id);
+    if (direction === 'up' && position > 0) {
+      moveTask(id, shownTasks[position - 1].id);
+    } else if (direction === 'down' && position < shownTasks.length - 1) {
+      moveTask(id, shownTasks[position + 1].id);
+    }
+  };
+
   const closeUndoSnackbar = () => setPendingUndo(null);
 
   // Remove every completed task and remember it (with its position) so
@@ -213,9 +231,9 @@ function App() {
     setPendingImport(null);
   };
 
-  // The task list as shown by the active filter, plus the counters the
-  // filter bar shows (pure helpers from utils/taskList.js).
-  const shownTasks = visibleTasks(tasks, filter);
+  // The task list as shown by the search query and the active filter, plus
+  // the counters the filter bar shows (pure helpers from utils/taskList.js).
+  const shownTasks = visibleTasks(tasksMatching(tasks, search), filter);
   const {
     active: activeCount,
     completed: completedCount,
@@ -280,6 +298,12 @@ function App() {
             titleFieldRef={titleInputRef}
           />
 
+          {/* Search box: filters the list by title, description or
+              subtask title (only shown while tasks exist) */}
+          {tasks.length > 0 && (
+            <SearchBar value={search} onSearchChange={setSearch} />
+          )}
+
           {/* Filter bar: All / Active / Completed, a counter and
             "clear completed" (only shown while tasks exist) */}
           {tasks.length > 0 && (
@@ -303,9 +327,11 @@ function App() {
               color="text.secondary"
               sx={{ my: 3, textAlign: 'center' }}
             >
-              {filter === 'active'
-                ? 'No active tasks – nice work!'
-                : 'No completed tasks yet.'}
+              {search.trim()
+                ? `No tasks match "${search.trim()}".`
+                : filter === 'active'
+                  ? 'No active tasks – nice work!'
+                  : 'No completed tasks yet.'}
             </Typography>
           )}
 
@@ -314,7 +340,7 @@ function App() {
           {shownTasks.length > 0 && (
             <Card elevation={1} sx={{ mb: 3 }}>
               <List component="ul" disablePadding>
-                {shownTasks.map((task) => (
+                {shownTasks.map((task, position) => (
                   <TaskItem
                     key={task.id}
                     task={task}
@@ -325,6 +351,10 @@ function App() {
                     onToggleSubtask={toggleSubtask}
                     onDeleteSubtask={deleteSubtask}
                     onEditSubtask={editSubtask}
+                    canMoveUp={position > 0}
+                    canMoveDown={position < shownTasks.length - 1}
+                    onMoveUp={() => handleMoveTask(task.id, 'up')}
+                    onMoveDown={() => handleMoveTask(task.id, 'down')}
                     focusToken={
                       focusTask && focusTask.id === task.id
                         ? focusTask.stamp

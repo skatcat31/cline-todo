@@ -57,3 +57,20 @@ export function mergeTasks(existing, incoming) {
   const existingIds = new Set(existing.map((task) => task.id));
   return [...existing, ...incoming.filter((task) => !existingIds.has(task.id))];
 }
+
+/**
+ * The tasks matching a search query (case‑insensitive substring match on
+ * the task title, the task description or any subtask title). An empty or
+ * whitespace‑only query matches every task.
+ */
+export function tasksMatching(tasks, query) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return tasks;
+  return tasks.filter((task) => {
+    if (task.title.toLowerCase().includes(needle)) return true;
+    if (task.description.toLowerCase().includes(needle)) return true;
+    return task.subtasks.some((subtask) =>
+      subtask.title.toLowerCase().includes(needle),
+    );
+  });
+}

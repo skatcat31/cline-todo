@@ -133,6 +133,20 @@ export function tasksReducer(tasks, action) {
       );
     case 'delete-task':
       return tasks.filter((t) => t.id !== action.id);
+    case 'move-task': {
+      // Swap the task with its neighbour (the app passes the id of the
+      // adjacent task in the *visible* list, so this also works while a
+      // filter hides other tasks). Unknown ids or a swap with itself leave
+      // the list untouched.
+      const fromIndex = tasks.findIndex((t) => t.id === action.id);
+      const toIndex = tasks.findIndex((t) => t.id === action.swapId);
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+        return tasks;
+      }
+      const next = [...tasks];
+      [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
+      return next;
+    }
     case 'insert-tasks': {
       // Re‑insert previously removed tasks at their remembered
       // positions (used by "undo", for both single deletes and "clear
@@ -220,8 +234,8 @@ export function tasksReducer(tasks, action) {
  * persistence (lazy load before the first render, save on every change).
  *
  * Returns `{ tasks, persistFailed, addTask, toggleTask, deleteTask,
- * insertTasks, editTask, addSubtask, toggleSubtask, deleteSubtask,
- * editSubtask, clearCompleted, replaceTasks }`.
+ * moveTask, insertTasks, editTask, addSubtask, toggleSubtask,
+ * deleteSubtask, editSubtask, clearCompleted, replaceTasks }`.
  * `addSubtask` returns the id of the created subtask so callers can move
  * focus to it after it has rendered. `persistFailed` is true after a
  * persistence attempt could not write to storage (quota exceeded,
@@ -278,6 +292,9 @@ export function useTasks() {
       }),
     toggleTask: (id) => dispatch({ type: 'toggle-task', id }),
     deleteTask: (id) => dispatch({ type: 'delete-task', id }),
+    // Swap a task with its neighbour in the full list (the app passes the
+    // id of the adjacent task in the currently visible list).
+    moveTask: (id, swapId) => dispatch({ type: 'move-task', id, swapId }),
     // Re‑add previously removed tasks at their remembered positions
     // (used by "undo" - single deletes and "clear completed").
     insertTasks: (items) => dispatch({ type: 'insert-tasks', items }),

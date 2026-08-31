@@ -1178,3 +1178,124 @@ test('defaults to dark when the system prefers dark', () => {
     window.matchMedia = originalMatchMedia;
   }
 });
+
+/**
+ * The search box filters the list by title or description (subtask titles
+ * are matched too – covered in utils/taskList.test.js). The query is
+ * transient, and a query without matches shows a hint.
+ */
+test('search filters the list by title and description', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const descInput = screen.getByLabelText(/^description/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+
+  await userEvent.type(titleInput, 'Buy milk');
+  await userEvent.type(descInput, 'two liters');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Ship release');
+  await userEvent.click(addTaskBtn);
+
+  const searchInput = screen.getByRole('textbox', { name: 'Search tasks' });
+
+  // Matches on the title
+  await userEvent.type(searchInput, 'milk');
+  expect(screen.getByText('Buy milk')).toBeInTheDocument();
+  expect(screen.queryByText('Ship release')).not.toBeInTheDocument();
+
+  // Matches on the description, too
+  await userEvent.clear(searchInput);
+  await userEvent.type(searchInput, 'liters');
+  expect(screen.getByText('Buy milk')).toBeInTheDocument();
+  expect(screen.queryByText('Ship release')).not.toBeInTheDocument();
+
+  // A query without matches shows a hint instead of the list
+  await userEvent.clear(searchInput);
+  await userEvent.type(searchInput, 'zzz');
+  expect(screen.getByText(/no tasks match/i)).toBeInTheDocument();
+  expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+
+  // Clearing the search restores the full list
+  await userEvent.clear(searchInput);
+  expect(screen.getByText('Buy milk')).toBeInTheDocument();
+  expect(screen.getByText('Ship release')).toBeInTheDocument();
+});
+
+/**
+ * "Move task up/down" swaps a task with its neighbour; the buttons are
+ * disabled at the edges of the visible list.
+ */
+test('moves a task down and back up again', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  const taskA = screen.getByRole('listitem', { name: 'Task A' });
+
+  // First row: "move up" is disabled; "move down" swaps with Task B
+  expect(
+    within(taskA).getByRole('button', { name: 'Move task up' }),
+  ).toBeDisabled();
+  await userEvent.click(
+    within(taskA).getByRole('button', { name: 'Move task down' }),
+  );
+
+  let rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task B')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task A')).toBeInTheDocument();
+
+  // Last row: "move down" is disabled; move Task A back to the top
+  expect(
+    within(rows[1]).getByRole('button', { name: 'Move task down' }),
+  ).toBeDisabled();
+  await userEvent.click(
+    within(rows[1]).getByRole('button', { name: 'Move task up' }),
+  );
+
+  rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task A')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task B')).toBeInTheDocument();
+});
+
+/**
+ * While a filter hides tasks, the move buttons operate on the *visible*
+ * list: a task swaps with its visible neighbour in the full list.
+ */
+test('moves tasks within the visible list while a filter is active', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+
+  await userEvent.type(titleInput, 'First');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Second');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Third');
+  await userEvent.click(addTaskBtn);
+
+  // Complete the middle task and show only the active ones
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Second' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Active' }));
+
+  // Visible: First, Third – move "Third" up (it swaps with "First")
+  const third = screen.getByRole('listitem', { name: 'Third' });
+  await userEvent.click(
+    within(third).getByRole('button', { name: 'Move task up' }),
+  );
+
+  const visible = screen.getAllByRole('listitem');
+  expect(within(visible[0]).getByText('Third')).toBeInTheDocument();
+  expect(within(visible[1]).getByText('First')).toBeInTheDocument();
+
+  // Back to "All": the completed task stays between them
+  await userEvent.click(screen.getByRole('button', { name: 'All' }));
+  const all = screen.getAllByRole('listitem');
+  expect(within(all[0]).getByText('Third')).toBeInTheDocument();
+  expect(within(all[1]).getByText('Second')).toBeInTheDocument();
+  expect(within(all[2]).getByText('First')).toBeInTheDocument();
+});

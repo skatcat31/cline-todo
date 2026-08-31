@@ -213,6 +213,24 @@ describe('useTasks', () => {
     expect(result.current.tasks[0].title).toBe('Task B');
   });
 
+  test('moveTask swaps a task with its neighbour', () => {
+    const { result } = renderHook(() => useTasks());
+    let taskA;
+    let taskB;
+    act(() => {
+      result.current.addTask('Task A', '');
+      result.current.addTask('Task B', '');
+    });
+    [taskA, taskB] = result.current.tasks;
+    act(() => {
+      result.current.moveTask(taskA.id, taskB.id);
+    });
+    expect(result.current.tasks.map((t) => t.title)).toEqual([
+      'Task B',
+      'Task A',
+    ]);
+  });
+
   test('editTask updates the trimmed title and description', () => {
     const { result } = renderHook(() => useTasks());
     act(() => {
@@ -410,6 +428,38 @@ describe('tasksReducer', () => {
         items: [{ task: x, index: -3 }],
       }).map((t) => t.id),
     ).toEqual(['x', 'a', 'b']);
+  });
+
+  test('move-task swaps the two tasks without mutating the state', () => {
+    const tasks = [
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+      { id: 'c', title: 'C', done: false, subtasks: [] },
+    ];
+    const after = tasksReducer(tasks, {
+      type: 'move-task',
+      id: 'a',
+      swapId: 'b',
+    });
+    expect(after.map((t) => t.id)).toEqual(['b', 'a', 'c']);
+    // The previous state array must not have been mutated.
+    expect(tasks.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('move-task leaves the list untouched for unknown or identical ids', () => {
+    const tasks = [
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+    ];
+    expect(
+      tasksReducer(tasks, { type: 'move-task', id: 'nope', swapId: 'b' }),
+    ).toBe(tasks);
+    expect(
+      tasksReducer(tasks, { type: 'move-task', id: 'a', swapId: 'nope' }),
+    ).toBe(tasks);
+    expect(
+      tasksReducer(tasks, { type: 'move-task', id: 'a', swapId: 'a' }),
+    ).toBe(tasks);
   });
 });
 

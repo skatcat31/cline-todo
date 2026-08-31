@@ -13,6 +13,10 @@ browser's `localStorage`.
 - Filter the list by status (All / Active / Completed) – the selection is
   remembered across reloads – with an active‑task counter and a "clear
   completed" action
+- Search the list by task title, description or subtask title (transient –
+  not persisted)
+- Reorder tasks with move up/down buttons (works on the visible list, so
+  it behaves sensibly while a filter is active)
 - Automatic persistence to `localStorage`, including cross‑tab sync
 - Export the task list as a JSON file; importing into a non‑empty list asks
   whether to replace it or merge the imported tasks into it
@@ -85,6 +89,8 @@ src/
     NewTaskForm.jsx    New‑task card form (owns its draft state)
     FilterBar.jsx      All/Active/Completed buttons, active‑task
                        counter, "clear completed"
+    SearchBar.jsx      Compact search box (the query is transient, owned by
+                       the app; matching lives in utils/taskList.js)
     ThemeToggle.jsx    Light/dark mode toggle for the app bar
     Placeholder.jsx    Empty state
     ErrorBoundary.jsx  Last‑resort crash UI with a reload button

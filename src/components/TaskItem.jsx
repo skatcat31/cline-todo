@@ -246,6 +246,7 @@ export default function TaskItem({
             onChange={(e) => setDraftDue(e.target.value)}
             fullWidth
             margin="normal"
+            slotProps={{ inputLabel: { shrink: true } }}
           />
           <Button type="submit" variant="contained" size="small" sx={{ mt: 1 }}>
             Save Task

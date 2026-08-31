@@ -1,10 +1,10 @@
 // List behaviour: filtering, search, reordering, undo and "clear completed".
 import App from './App';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { act, render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Compatibility layer for jest-dom with Vitest
 import '@testing-library/jest-dom/vitest';
-import { test, expect } from 'vitest';
+import { test, expect, vi } from 'vitest';
 
 /**
  * The filter bar shows only the tasks matching the selected filter, and the
@@ -278,6 +278,64 @@ test('pressing Escape discards all pending undos', async () => {
   // No undo is offered anymore and both tasks stay gone
   expect(screen.queryByText('Task A')).not.toBeInTheDocument();
   expect(screen.queryByText('Task B')).not.toBeInTheDocument();
+});
+
+/**
+ * When the snackbar auto‑hides, only the newest undo is dropped: the
+ * snackbar re‑opens for the previous pending undo (its fresh key restarts
+ * the auto‑hide timer) instead of discarding the whole stack after one
+ * 6‑second window.
+ */
+test('auto-hide offers the previous undo instead of discarding the stack', async () => {
+  // Fake timers (auto‑advancing, so userEvent's internal delays keep
+  // resolving) make the 6‑second auto‑hide jumpable without waiting for it.
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    render(<App />);
+    const titleInput = screen.getByLabelText(/^title/i);
+    const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+    await userEvent.type(titleInput, 'Task A');
+    await userEvent.click(addTaskBtn);
+    await userEvent.type(titleInput, 'Task B');
+    await userEvent.click(addTaskBtn);
+
+    await userEvent.click(
+      within(screen.getByRole('listitem', { name: 'Task A' })).getByRole(
+        'button',
+        { name: 'Delete task' },
+      ),
+    );
+    await userEvent.click(
+      within(screen.getByRole('listitem', { name: 'Task B' })).getByRole(
+        'button',
+        { name: 'Delete task' },
+      ),
+    );
+    expect(await screen.findByText('Deleted "Task B"')).toBeInTheDocument();
+
+    // Jump past the auto‑hide duration: the snackbar now offers the
+    // previous (older) undo instead of disappearing.
+    await act(async () => {
+      vi.advanceTimersByTime(6000);
+    });
+    expect(screen.getByText('Deleted "Task A"')).toBeInTheDocument();
+    expect(screen.queryByText('Task B')).not.toBeInTheDocument();
+
+    // The auto‑hide finalized Task B's deletion: undo now restores the
+    // remaining (older) deletion…
+    await userEvent.click(screen.getByRole('button', { name: /^undo$/i }));
+    expect(screen.getByText('Task A')).toBeInTheDocument();
+    // …while Task B stays gone.
+    expect(screen.queryByText('Task B')).not.toBeInTheDocument();
+    // The stack is empty again: the snackbar closes.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: /^undo$/i }),
+      ).not.toBeInTheDocument(),
+    );
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 /**

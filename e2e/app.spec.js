@@ -91,3 +91,37 @@ test('undoes several deletions in reverse order', async ({ page }) => {
     page.getByRole('listitem', { name: 'First task' }),
   ).toBeVisible();
 });
+
+test('auto-hide offers the previous undo instead of discarding the stack', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByLabel('Title').fill('First task');
+  await page.getByRole('button', { name: 'Add Task' }).click();
+  await page.getByLabel('Title').fill('Second task');
+  await page.getByRole('button', { name: 'Add Task' }).click();
+
+  await page
+    .getByRole('listitem', { name: 'First task' })
+    .getByRole('button', { name: 'Delete task' })
+    .click();
+  await page
+    .getByRole('listitem', { name: 'Second task' })
+    .getByRole('button', { name: 'Delete task' })
+    .click();
+  await expect(page.getByText('Deleted "Second task"')).toBeVisible();
+
+  // Wait out the 6‑second auto‑hide: the snackbar re‑opens for the previous
+  // undo (with a fresh timer) instead of disappearing entirely.
+  await page.waitForTimeout(6500);
+  await expect(page.getByText('Deleted "First task"')).toBeVisible();
+
+  // Undo restores the remaining deletion; the expired one stays gone.
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(
+    page.getByRole('listitem', { name: 'First task' }),
+  ).toBeVisible();
+  await expect(page.getByRole('listitem', { name: 'Second task' })).toHaveCount(
+    0,
+  );
+});

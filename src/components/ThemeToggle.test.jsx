@@ -5,24 +5,42 @@ import { expect, test, vi } from 'vitest';
 import ThemeToggle from './ThemeToggle.jsx';
 
 // Unit tests for the extracted ThemeToggle component: it only reports the
-// click - the parent owns the mode state (and its persistence).
+// selection - the parent owns the mode state (and its persistence).
 
-test('in light mode it offers to switch to dark mode', async () => {
-  const onToggle = vi.fn();
-  render(<ThemeToggle mode="light" onToggle={onToggle} />);
-  const toggle = screen.getByRole('button', {
-    name: 'Switch to dark mode',
-  });
-  await userEvent.click(toggle);
-  expect(onToggle).toHaveBeenCalledTimes(1);
+test('offers all three color schemes', () => {
+  render(<ThemeToggle mode="light" onModeChange={vi.fn()} />);
+  for (const label of ['Light theme', 'System theme', 'Dark theme']) {
+    expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+  }
 });
 
-test('in dark mode it offers to switch to light mode', async () => {
-  const onToggle = vi.fn();
-  render(<ThemeToggle mode="dark" onToggle={onToggle} />);
-  const toggle = screen.getByRole('button', {
-    name: 'Switch to light mode',
-  });
-  await userEvent.click(toggle);
-  expect(onToggle).toHaveBeenCalledTimes(1);
+test('reports the chosen scheme', async () => {
+  const onModeChange = vi.fn();
+  render(<ThemeToggle mode="light" onModeChange={onModeChange} />);
+  await userEvent.click(screen.getByRole('button', { name: 'System theme' }));
+  expect(onModeChange).toHaveBeenCalledTimes(1);
+  expect(onModeChange).toHaveBeenCalledWith('system');
+});
+
+test('marks the active scheme with aria-pressed', () => {
+  render(<ThemeToggle mode="dark" onModeChange={vi.fn()} />);
+  expect(screen.getByRole('button', { name: 'Dark theme' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  expect(screen.getByRole('button', { name: 'Light theme' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  expect(screen.getByRole('button', { name: 'System theme' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+});
+
+test('does not report a mode when the active button is clicked again', async () => {
+  const onModeChange = vi.fn();
+  render(<ThemeToggle mode="dark" onModeChange={onModeChange} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Dark theme' }));
+  expect(onModeChange).not.toHaveBeenCalled();
 });

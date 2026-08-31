@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -23,9 +23,9 @@ import Placeholder from './components/Placeholder.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import TaskItem from './components/TaskItem.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
+import { useColorScheme } from './hooks/useColorScheme.js';
 import { usePersistentState } from './hooks/usePersistentState.js';
 import { useTasks } from './hooks/useTasks.js';
-import { createAppTheme } from './theme.js';
 import { FILTERS } from './utils/filters.js';
 import { downloadTasks, parseTasksFile } from './utils/taskFile.js';
 import {
@@ -41,29 +41,6 @@ import {
 // values are the entries of FILTERS, imported from utils/filters.js;
 // anything else falls back to "all").
 const FILTER_KEY = 'todo-filter';
-
-// localStorage key for the color scheme preference.
-const THEME_KEY = 'todo-theme';
-
-/**
- * Initial color scheme: an explicit user choice wins; otherwise follow the
- * OS preference when the browser exposes it; default to light.
- */
-function initialThemeMode() {
-  try {
-    const stored = localStorage.getItem(THEME_KEY);
-    if (stored === 'light' || stored === 'dark') return stored;
-  } catch {
-    // storage unavailable – fall through
-  }
-  if (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  ) {
-    return 'dark';
-  }
-  return 'light';
-}
 
 // A simple To Do application allowing users to add tasks with a title and
 // description. Task state, mutations and persistence live in the `useTasks`
@@ -118,13 +95,10 @@ function App() {
   const [focusTask, setFocusTask] = useState(null);
   // Hidden file input used by the "Import tasks" button.
   const fileInputRef = useRef(null);
-  // Color scheme: "light" or "dark" – remembered in localStorage (via
-  // usePersistentState); the lazy initializer picks an explicit user
-  // choice, then the OS preference, then light (see initialThemeMode).
-  const [mode, setMode] = usePersistentState(THEME_KEY, initialThemeMode);
-
-  // Build the theme only when the mode actually changes.
-  const theme = useMemo(() => createAppTheme(mode), [mode]);
+  // Color scheme: "light", "system" (follow the OS) or "dark"; the hook
+  // persists the choice, tracks the OS preference live in "system" mode and
+  // hands back the concrete MUI theme for the effective scheme.
+  const { mode, setMode, theme } = useColorScheme();
 
   // Handle adding a new top‑level task (NewTaskForm owns the draft
   // fields and calls this with their values).
@@ -271,11 +245,9 @@ function App() {
             >
               <FileUpload fontSize="small" />
             </IconButton>
-            {/* Light/dark color‑scheme toggle; the choice is persisted */}
-            <ThemeToggle
-              mode={mode}
-              onToggle={() => setMode(mode === 'light' ? 'dark' : 'light')}
-            />
+            {/* Color‑scheme selector (light / system / dark); the choice is
+                persisted by useColorScheme */}
+            <ThemeToggle mode={mode} onModeChange={setMode} />
             <input
               ref={fileInputRef}
               type="file"

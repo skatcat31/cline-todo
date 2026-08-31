@@ -31,10 +31,21 @@ test('clears completed tasks and can undo', async ({ page }) => {
 
 test('remembers the color scheme after a reload', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+  await page.getByRole('button', { name: 'Dark theme' }).click();
   await page.reload();
-  // The persisted "dark" choice flips the toggle's label
+  // The persisted choice selects the dark toggle (MUI sets aria‑pressed)
   await expect(
-    page.getByRole('button', { name: 'Switch to light mode' }),
-  ).toBeVisible();
+    page.getByRole('button', { name: 'Dark theme' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('system color scheme follows the OS preference', async ({ page }) => {
+  // Pin the OS color scheme to light, then flip it: with no stored
+  // preference the app (default "system" scheme) must follow live.
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+  await expect(page.locator('html')).not.toHaveClass(/dark/);
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveClass(/dark/);
 });

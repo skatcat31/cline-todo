@@ -20,8 +20,8 @@ browser's `localStorage`.
 - Automatic persistence to `localStorage`, including cross‑tab sync
 - Export the task list as a JSON file; importing into a non‑empty list asks
   whether to replace it or merge the imported tasks into it
-- Light / dark color scheme: app‑bar toggle, persisted choice, follows the
-  OS preference on first visit
+- Color scheme: light / system / dark (app‑bar selector); the choice is
+  persisted and the system option follows the OS preference live
 - Progressive Web App: installable (SVG + 192/512 PNG + maskable icons) and
   fully usable offline, including the self‑hosted Roboto typeface
 - Accessible Material Design UI (keyboard focus management, screen‑reader
@@ -79,7 +79,10 @@ src/
     useTasks.js           Task state (useReducer) + mutations + localStorage
                        persistence (lazy load, cross‑tab sync)
     usePersistentState.js useState mirrored into localStorage (best effort);
-                       used for the filter and the theme
+                       used for the filter
+    useColorScheme.js   Color scheme (light/system/dark): persists the
+                       choice, follows the OS preference live in "system"
+                       mode, marks <html class="dark">
   components/
     TaskItem.jsx       One task row, its edit form, subtask progress and
                        subtask management (focusToken moves focus to its
@@ -91,7 +94,7 @@ src/
                        counter, "clear completed"
     SearchBar.jsx      Compact search box (the query is transient, owned by
                        the app; matching lives in utils/taskList.js)
-    ThemeToggle.jsx    Light/dark mode toggle for the app bar
+    ThemeToggle.jsx    Light / system / dark selector for the app bar
     Placeholder.jsx    Empty state
     ErrorBoundary.jsx  Last‑resort crash UI with a reload button
   utils/

@@ -122,9 +122,14 @@ src/
   (`.github/workflows/ci.yml`): a `ci` job (lint, format check, test with
   coverage, build), an `e2e` job (Playwright) and a `deploy` job that
   publishes `dist/` to GitHub Pages. The Vite `base` is derived from
-  `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path.
+  `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path. GitHub
+  Pages cannot set response headers, so the build injects a
+  `Content-Security-Policy` meta tag into `index.html` instead.
 - **Docker** – a multi‑stage build compiles the site with Node and serves
-  it with nginx (running as the unprivileged `nginx` user on port 8080):
+  it with nginx (running as the unprivileged `nginx` user on port 8080);
+  nginx also sends the security headers (`Content-Security-Policy`,
+  `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options` – see
+  `nginx.conf`):
 
   ```sh
   docker build -t agentic-todo .

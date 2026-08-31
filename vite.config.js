@@ -54,6 +54,32 @@ export const pwaOptions = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Security headers
+// ---------------------------------------------------------------------------
+// The app is static and self‑contained: every resource (including the
+// self‑hosted fonts) comes from its own origin, and this policy encodes
+// exactly that – and nothing else. `style-src 'unsafe-inline'` is required
+// because Emotion injects <style> elements at runtime.
+const CSP =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'";
+
+// GitHub Pages cannot set HTTP response headers, so the production build
+// carries the policy as a <meta> tag inside index.html. The Docker/nginx
+// deployment sets the same policy as a real HTTP header (plus
+// X‑Frame‑Options, which a meta tag cannot express) – see nginx.conf.
+export const securityMetaTag = `<meta http-equiv="Content-Security-Policy" content="${CSP}" />`;
+
+// Injects the CSP meta tag into the built index.html. `apply: 'build'`
+// keeps it out of the dev server, where the policy would block Vite's HMR
+// websocket.
+export const injectSecurityMeta = {
+  name: 'inject-security-meta',
+  apply: 'build',
+  transformIndexHtml: (html) =>
+    html.replace('</head>', `${securityMetaTag}\n</head>`),
+};
+
 export default defineConfig({
   plugins: [
     react(),
@@ -63,6 +89,8 @@ export default defineConfig({
     // The options live in an exported constant so the manifest and the
     // precache pattern can be asserted in tests (see vite.config.test.js).
     VitePWA(pwaOptions),
+    // Content‑Security‑Policy meta tag (build only – see above).
+    injectSecurityMeta,
   ],
   // When deploying to GitHub Pages the site is served from a sub‑path
   // matching the repository name. Vite's `base` option handles this.

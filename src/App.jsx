@@ -180,11 +180,21 @@ function App() {
     }
   };
 
-  // Dismiss the undo snackbar and clear the stack. Auto‑hide and Escape
-  // discard the pending undos; a click anywhere else in the app (reason
-  // "clickaway") must NOT discard them – the user is just working on (or
-  // deleting) more tasks.
+  // Handle the undo snackbar closing. The close reasons have different
+  // intents:
+  //  - "timeout" (the auto‑hide expired): drop only the newest entry, so
+  //    the snackbar re‑opens for the previous undo (the changing key
+  //    restarts the auto‑hide timer for it) instead of discarding the
+  //    whole stack after a single 6‑second window;
+  //  - "clickaway" (a click anywhere else in the app): keep the stack –
+  //    the user is just working on (or deleting) more tasks;
+  //  - anything else (the close button, the Escape key): an explicit
+  //    dismiss – clear the whole stack.
   const closeUndoSnackbar = (event, reason) => {
+    if (reason === 'timeout') {
+      setUndoStack((prev) => prev.slice(0, -1));
+      return;
+    }
     if (reason === 'clickaway') return;
     setUndoStack([]);
   };
@@ -397,7 +407,9 @@ function App() {
           completed") pushes an entry onto a stack (most recent last);
           "Undo" re‑inserts the newest entry and the snackbar then offers
           the previous one until the stack is empty. The changing key
-          restarts the auto‑hide timer for every new entry. */}
+          restarts the auto‑hide timer for every entry: auto‑hide only
+          drops the newest one, so each pending undo gets its own
+          6‑second window instead of the whole stack expiring at once. */}
         <Snackbar
           key={
             undoStack.length > 0

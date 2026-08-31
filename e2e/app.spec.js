@@ -49,3 +49,12 @@ test('system color scheme follows the OS preference', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect(page.locator('html')).toHaveClass(/dark/);
 });
+
+test('shows the due date of a task', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Title').fill('Plan trip');
+  await page.getByLabel('Due date (optional)').fill('2999-05-01');
+  await page.getByRole('button', { name: 'Add Task' }).click();
+  await expect(page.getByRole('listitem', { name: 'Plan trip' })).toBeVisible();
+  await expect(page.getByText('Due May 1, 2999')).toBeVisible();
+});

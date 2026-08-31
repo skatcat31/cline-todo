@@ -33,6 +33,7 @@ describe('useTasks', () => {
         id: 'stored-1',
         title: 'Stored task',
         description: '',
+        due: null,
         done: true,
         subtasks: [],
       },
@@ -53,6 +54,7 @@ describe('useTasks', () => {
         id: 'stored-1',
         title: 'Stored task',
         description: '',
+        due: null,
         done: false,
         subtasks: [],
       },
@@ -197,6 +199,42 @@ describe('useTasks', () => {
     });
     expect(result.current.tasks[0].done).toBe(true);
     expect(result.current.tasks[1].done).toBe(false);
+  });
+
+  test('addTask stores a valid due date and normalises invalid ones to null', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      result.current.addTask('With due', '', '2026-09-10');
+      result.current.addTask('Bad due', '', 'not a date');
+      result.current.addTask('No due', '');
+    });
+    expect(result.current.tasks[0].due).toBe('2026-09-10');
+    expect(result.current.tasks[1].due).toBeNull();
+    expect(result.current.tasks[2].due).toBeNull();
+  });
+
+  test('editTask updates the due date (including clearing it)', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      result.current.addTask('Task A', '', '2026-09-10');
+    });
+    const [firstTask] = result.current.tasks;
+    act(() => {
+      result.current.editTask(firstTask.id, {
+        title: 'Task A',
+        description: '',
+        due: '2026-10-01',
+      });
+    });
+    expect(result.current.tasks[0].due).toBe('2026-10-01');
+    act(() => {
+      result.current.editTask(firstTask.id, {
+        title: 'Task A',
+        description: '',
+        due: null,
+      });
+    });
+    expect(result.current.tasks[0].due).toBeNull();
   });
 
   test('deleteTask removes the matching task', () => {
@@ -478,7 +516,29 @@ describe('normalizeTasks', () => {
       { id: 't1', title: 'Task', done: 'yes', subtasks: 'nope' },
     ]);
     expect(normalized).toEqual([
-      { id: 't1', title: 'Task', description: '', done: true, subtasks: [] },
+      {
+        id: 't1',
+        title: 'Task',
+        description: '',
+        due: null,
+        done: true,
+        subtasks: [],
+      },
+    ]);
+  });
+
+  test('keeps a valid due date and drops an invalid one', () => {
+    const normalized = normalizeTasks([
+      { id: 'a', title: 'Valid', due: '2026-09-10' },
+      { id: 'b', title: 'Impossible date', due: '2026-02-30' },
+      { id: 'c', title: 'Wrong shape', due: 42 },
+      { id: 'd', title: 'No due' },
+    ]);
+    expect(normalized.map((task) => task.due)).toEqual([
+      '2026-09-10',
+      null,
+      null,
+      null,
     ]);
   });
 
@@ -510,7 +570,14 @@ describe('parseStoredTasks', () => {
       }),
     );
     expect(parsed).toEqual([
-      { id: 'x', title: 'X', description: '', done: true, subtasks: [] },
+      {
+        id: 'x',
+        title: 'X',
+        description: '',
+        due: null,
+        done: true,
+        subtasks: [],
+      },
     ]);
   });
 
@@ -519,7 +586,14 @@ describe('parseStoredTasks', () => {
       JSON.stringify([{ id: 'x', title: 'X', done: false }]),
     );
     expect(parsed).toEqual([
-      { id: 'x', title: 'X', description: '', done: false, subtasks: [] },
+      {
+        id: 'x',
+        title: 'X',
+        description: '',
+        due: null,
+        done: false,
+        subtasks: [],
+      },
     ]);
   });
 

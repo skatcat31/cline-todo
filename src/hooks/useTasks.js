@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useState } from 'react';
+import { normalizeDue } from '../utils/dates.js';
 
 // localStorage key under which the task list is persisted.
 export const STORAGE_KEY = 'tasks';
@@ -39,6 +40,7 @@ export function normalizeTasks(value) {
       id: task.id,
       title: task.title,
       description: typeof task.description === 'string' ? task.description : '',
+      due: normalizeDue(task.due),
       done: Boolean(task.done),
       subtasks: Array.isArray(task.subtasks)
         ? task.subtasks
@@ -109,7 +111,8 @@ function loadTasks() {
  * it can be unit‑tested without rendering any components.
  *
  * State is the task list – an array of
- *   { id, title, description, done, subtasks: [{ id, title, description, done }] }
+ *   { id, title, description, due, done, subtasks: [{ id, title, description, done }] }
+ * `due` is a local "YYYY-MM-DD" date or `null`.
  */
 export function tasksReducer(tasks, action) {
   switch (action.type) {
@@ -123,6 +126,7 @@ export function tasksReducer(tasks, action) {
           id: nextId(),
           title: action.title,
           description: action.description,
+          due: action.due ?? null,
           done: false,
           subtasks: [],
         },
@@ -163,7 +167,12 @@ export function tasksReducer(tasks, action) {
     case 'edit-task':
       return tasks.map((t) =>
         t.id === action.id
-          ? { ...t, title: action.title, description: action.description }
+          ? {
+              ...t,
+              title: action.title,
+              description: action.description,
+              due: action.due ?? null,
+            }
           : t,
       );
     case 'add-subtask':
@@ -284,11 +293,12 @@ export function useTasks() {
   return {
     tasks,
     persistFailed,
-    addTask: (title, description) =>
+    addTask: (title, description, due) =>
       dispatch({
         type: 'add-task',
         title: title.trim(),
         description: description.trim(),
+        due: normalizeDue(due),
       }),
     toggleTask: (id) => dispatch({ type: 'toggle-task', id }),
     deleteTask: (id) => dispatch({ type: 'delete-task', id }),
@@ -298,12 +308,13 @@ export function useTasks() {
     // Re‑add previously removed tasks at their remembered positions
     // (used by "undo" - single deletes and "clear completed").
     insertTasks: (items) => dispatch({ type: 'insert-tasks', items }),
-    editTask: (id, { title, description }) =>
+    editTask: (id, { title, description, due }) =>
       dispatch({
         type: 'edit-task',
         id,
         title: title.trim(),
         description: description.trim(),
+        due: normalizeDue(due),
       }),
     addSubtask: (parentId, { title, description }) => {
       const id = nextId();

@@ -1,10 +1,17 @@
 // Task & subtask management: toggling, deleting, editing, focus handling and Escape.
 import App from './App';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Compatibility layer for jest-dom with Vitest
 import '@testing-library/jest-dom/vitest';
 import { test, expect } from 'vitest';
+import { todayISO } from './utils/dates.js';
 
 /**
  * Toggle the done state of the first sub‑task when multiple sub‑tasks exist.
@@ -445,4 +452,59 @@ test('shows subtask progress that updates as subtasks are completed', async () =
   // Complete one subtask
   await userEvent.click(screen.getByRole('checkbox', { name: 'Sub 1' }));
   expect(screen.getByText('1 of 2 subtasks done')).toBeInTheDocument();
+});
+
+/**
+ * Due dates: set when creating or editing a task; overdue and due‑today
+ * tasks are highlighted (the pure date logic lives in utils/dates.js).
+ */
+test('adding a task with a due date shows it in the list', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  await userEvent.type(titleInput, 'Plan trip');
+  fireEvent.change(screen.getByLabelText(/^due date/i), {
+    target: { value: '2999-05-01' },
+  });
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+  expect(screen.getByText('Due May 1, 2999')).toBeInTheDocument();
+});
+
+test('a task past its due date is flagged as overdue', async () => {
+  render(<App />);
+  await userEvent.type(screen.getByLabelText(/^title/i), 'Pay rent');
+  fireEvent.change(screen.getByLabelText(/^due date/i), {
+    target: { value: '2000-01-01' },
+  });
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+  expect(screen.getByText('Overdue (due Jan 1, 2000)')).toBeInTheDocument();
+});
+
+test('a task due today is marked "Due today"', async () => {
+  render(<App />);
+  await userEvent.type(screen.getByLabelText(/^title/i), 'Standup');
+  fireEvent.change(screen.getByLabelText(/^due date/i), {
+    target: { value: todayISO() },
+  });
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+  expect(screen.getByText('Due today')).toBeInTheDocument();
+});
+
+test('editing a task updates its due date', async () => {
+  render(<App />);
+  await userEvent.type(screen.getByLabelText(/^title/i), 'Task A');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+
+  const itemA = screen.getByRole('listitem', { name: 'Task A' });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Edit task' }),
+  );
+  // A 2999 date is always in another year, so the badge includes the year
+  // no matter when the test runs.
+  fireEvent.change(screen.getByLabelText(/^edit due date/i), {
+    target: { value: '2999-06-15' },
+  });
+  await userEvent.click(
+    within(itemA).getByRole('button', { name: 'Save Task' }),
+  );
+  expect(screen.getByText('Due Jun 15, 2999')).toBeInTheDocument();
 });

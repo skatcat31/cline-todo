@@ -102,8 +102,8 @@ function App() {
 
   // Handle adding a new top‑level task (NewTaskForm owns the draft
   // fields and calls this with their values).
-  const handleAddTask = ({ title, description }) => {
-    addTask(title, description);
+  const handleAddTask = ({ title, description, due }) => {
+    addTask(title, description, due);
   };
 
   // Delete a task but remember it (with its position) so the snackbar can

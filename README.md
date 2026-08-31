@@ -17,6 +17,8 @@ browser's `localStorage`.
   not persisted)
 - Reorder tasks with move up/down buttons (works on the visible list, so
   it behaves sensibly while a filter is active)
+- Due dates on tasks: set when adding or editing; overdue and due‑today
+  tasks are highlighted
 - Automatic persistence to `localStorage`, including cross‑tab sync
 - Export the task list as a JSON file; importing into a non‑empty list asks
   whether to replace it or merge the imported tasks into it
@@ -102,6 +104,8 @@ src/
                        parse + validate)
     taskList.js        Pure list‑level operations: filtering, counters, the
                        "clear completed" undo payload and import merging
+    dates.js           Due‑date helpers: local "YYYY‑MM‑DD" dates, overdue
+                       detection and display formatting
     filters.js         The FILTERS list (value + label) shared by FilterBar
                        and the app‑level filter validation
   test/

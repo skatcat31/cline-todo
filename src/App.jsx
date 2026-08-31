@@ -27,6 +27,13 @@ import { useTasks } from './hooks/useTasks.js';
 import { createAppTheme } from './theme.js';
 import { FILTERS } from './utils/filters.js';
 import { downloadTasks, parseTasksFile } from './utils/taskFile.js';
+import {
+  completedItems,
+  indexOfTask,
+  mergeTasks,
+  taskCounts,
+  visibleTasks,
+} from './utils/taskList.js';
 
 // localStorage key under which the active filter is remembered (the legal
 // values are the entries of FILTERS, imported from utils/filters.js;
@@ -125,7 +132,7 @@ function App() {
   // focuses its own checkbox when focusToken points at it), or to the
   // new‑task title field when the list becomes empty.
   const handleDeleteTask = (id) => {
-    const index = tasks.findIndex((task) => task.id === id);
+    const index = indexOfTask(tasks, id);
     const task = tasks[index];
     const remaining = tasks.filter((t) => t.id !== id);
     deleteTask(id);
@@ -152,9 +159,7 @@ function App() {
   // Remove every completed task and remember it (with its position) so
   // the snackbar can offer an undo, like for single deletes.
   const handleClearCompleted = () => {
-    const removed = tasks
-      .map((task, index) => ({ task, index }))
-      .filter(({ task }) => task.done);
+    const removed = completedItems(tasks);
     clearCompleted();
     if (removed.length > 0) setPendingUndo({ items: removed });
   };
@@ -204,24 +209,18 @@ function App() {
   // overwrites.
   const handleImportMerge = () => {
     if (!pendingImport) return;
-    const existingIds = new Set(tasks.map((task) => task.id));
-    const merged = [
-      ...tasks,
-      ...pendingImport.filter((task) => !existingIds.has(task.id)),
-    ];
-    replaceTasks(merged);
+    replaceTasks(mergeTasks(tasks, pendingImport));
     setPendingImport(null);
   };
 
-  // The task list as shown by the active filter
-  const visibleTasks =
-    filter === 'all'
-      ? tasks
-      : tasks.filter((task) =>
-          filter === 'completed' ? task.done : !task.done,
-        );
-  const activeCount = tasks.filter((task) => !task.done).length;
-  const completedCount = tasks.length - activeCount;
+  // The task list as shown by the active filter, plus the counters the
+  // filter bar shows (pure helpers from utils/taskList.js).
+  const shownTasks = visibleTasks(tasks, filter);
+  const {
+    active: activeCount,
+    completed: completedCount,
+    total: totalCount,
+  } = taskCounts(tasks);
 
   return (
     <ThemeProvider theme={theme}>
@@ -288,7 +287,7 @@ function App() {
               filter={filter}
               onFilterChange={setFilter}
               activeCount={activeCount}
-              totalCount={tasks.length}
+              totalCount={totalCount}
               completedCount={completedCount}
               onClearCompleted={handleClearCompleted}
             />
@@ -298,7 +297,7 @@ function App() {
           {tasks.length === 0 && <Placeholder />}
 
           {/* Hint when the active filter has no matching tasks */}
-          {tasks.length > 0 && visibleTasks.length === 0 && (
+          {tasks.length > 0 && shownTasks.length === 0 && (
             <Typography
               variant="body1"
               color="text.secondary"
@@ -312,10 +311,10 @@ function App() {
 
           {/* List of tasks, presented on a shared paper surface with
             Material list dividers between items */}
-          {visibleTasks.length > 0 && (
+          {shownTasks.length > 0 && (
             <Card elevation={1} sx={{ mb: 3 }}>
               <List component="ul" disablePadding>
-                {visibleTasks.map((task) => (
+                {shownTasks.map((task) => (
                   <TaskItem
                     key={task.id}
                     task={task}

@@ -3,6 +3,12 @@ import { useEffect, useReducer, useState } from 'react';
 // localStorage key under which the task list is persisted.
 export const STORAGE_KEY = 'tasks';
 
+// The version of the persisted payload. Bump it – and extend
+// parseStoredTasks with a migration – whenever the stored shape changes, so
+// an older payload is recognized and upgraded instead of silently losing
+// data.
+export const STORAGE_VERSION = 1;
+
 // Generate a unique id for new tasks and subtasks. `crypto.randomUUID` is
 // only available in secure contexts (https, localhost), so fall back to a
 // time/random based id elsewhere instead of crashing.
@@ -57,6 +63,28 @@ export function normalizeTasks(value) {
 }
 
 /**
+ * Parse and normalize a persisted task payload.
+ *
+ * The current format is `{ version, tasks }`; earlier versions (and hand
+ * edited storage) held a bare task array, so both are accepted – upgrading
+ * users keep their list. Anything that is not valid JSON or does not
+ * contain a task list becomes an empty list, never an error.
+ */
+export function parseStoredTasks(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    console.error('Failed to parse tasks from storage', error);
+    return [];
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return normalizeTasks(parsed.tasks);
+  }
+  return normalizeTasks(parsed);
+}
+
+/**
  * Read and normalize the persisted task list. Used as the lazy initializer
  * for the reducer so the very first render already shows the stored tasks
  * (no empty‑list flash, no redundant write of an empty list before
@@ -67,9 +95,11 @@ function loadTasks() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
-    return normalizeTasks(JSON.parse(stored));
+    return parseStoredTasks(stored);
   } catch (error) {
-    console.error('Failed to parse tasks from storage', error);
+    // localStorage itself can throw (e.g. some private‑browsing modes);
+    // the list simply starts empty then.
+    console.error('Failed to read tasks from storage', error);
     return [];
   }
 }
@@ -208,10 +238,14 @@ export function useTasks() {
   // Whether the most recent persistence attempt failed.
   const [persistFailed, setPersistFailed] = useState(false);
 
-  // Persist tasks to storage whenever they change
+  // Persist tasks to storage whenever they change (as a versioned payload,
+  // so future shape changes can be migrated – see parseStoredTasks).
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ version: STORAGE_VERSION, tasks }),
+      );
       setPersistFailed(false);
     } catch (error) {
       // The write failed – keep the app usable and let the UI warn the user.
@@ -226,14 +260,8 @@ export function useTasks() {
   useEffect(() => {
     const handleStorage = (event) => {
       if (event.key !== STORAGE_KEY || event.newValue === null) return;
-      try {
-        dispatch({
-          type: 'hydrate',
-          tasks: normalizeTasks(JSON.parse(event.newValue)),
-        });
-      } catch (error) {
-        console.error('Failed to parse tasks from storage event', error);
-      }
+      // parseStoredTasks accepts both payload versions and never throws.
+      dispatch({ type: 'hydrate', tasks: parseStoredTasks(event.newValue) });
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);

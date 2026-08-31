@@ -91,6 +91,8 @@ src/
   utils/
     taskFile.js        JSON export/import helpers (serialize, download,
                        parse + validate)
+    taskList.js        Pure list‑level operations: filtering, counters, the
+                       "clear completed" undo payload and import merging
     filters.js         The FILTERS list (value + label) shared by FilterBar
                        and the app‑level filter validation
   test/

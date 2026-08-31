@@ -9,6 +9,7 @@ import {
 import userEvent from '@testing-library/user-event';
 // Compatibility layer for jest-dom with Vitest
 import '@testing-library/jest-dom/vitest';
+import { STORAGE_VERSION } from './hooks/useTasks.js';
 import { test, expect, vi } from 'vitest';
 
 /**
@@ -688,7 +689,8 @@ test('normalizes badly shaped task data from localStorage', () => {
 });
 
 /**
- * Tasks are written to localStorage whenever they change.
+ * Tasks are written to localStorage as a versioned payload whenever they
+ * change.
  */
 test('persists tasks to localStorage as they change', async () => {
   render(<App />);
@@ -696,8 +698,9 @@ test('persists tasks to localStorage as they change', async () => {
   await userEvent.type(titleInput, 'Persisted task');
   await userEvent.click(screen.getByRole('button', { name: /add task/i }));
   const stored = JSON.parse(localStorage.getItem('tasks'));
-  expect(stored).toHaveLength(1);
-  expect(stored[0]).toMatchObject({
+  expect(stored.version).toBe(STORAGE_VERSION);
+  expect(stored.tasks).toHaveLength(1);
+  expect(stored.tasks[0]).toMatchObject({
     title: 'Persisted task',
     description: '',
     done: false,
@@ -1064,7 +1067,7 @@ test('import merging keeps existing tasks and adds the new ones', async () => {
   await userEvent.type(titleInput, 'Existing');
   await userEvent.click(screen.getByRole('button', { name: /add task/i }));
   // Read the generated id so the file can include a duplicate on purpose.
-  const existingId = JSON.parse(localStorage.getItem('tasks'))[0].id;
+  const existingId = JSON.parse(localStorage.getItem('tasks')).tasks[0].id;
 
   const file = new File(
     [

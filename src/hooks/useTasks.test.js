@@ -2,7 +2,9 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import {
   STORAGE_KEY,
+  STORAGE_VERSION,
   normalizeTasks,
+  parseStoredTasks,
   tasksReducer,
   useTasks,
 } from './useTasks.js';
@@ -35,6 +37,37 @@ describe('useTasks', () => {
         subtasks: [],
       },
     ]);
+  });
+
+  test('loads a versioned payload ({version, tasks}) from storage', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: STORAGE_VERSION,
+        tasks: [{ id: 'stored-1', title: 'Stored task', done: false }],
+      }),
+    );
+    const { result } = renderHook(() => useTasks());
+    expect(result.current.tasks).toEqual([
+      {
+        id: 'stored-1',
+        title: 'Stored task',
+        description: '',
+        done: false,
+        subtasks: [],
+      },
+    ]);
+  });
+
+  test('persists the list as a versioned payload', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      result.current.addTask('Task A', '');
+    });
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    expect(stored.version).toBe(STORAGE_VERSION);
+    expect(stored.tasks).toHaveLength(1);
+    expect(stored.tasks[0]).toMatchObject({ title: 'Task A', done: false });
   });
 
   test('falls back to an empty list when the stored value is corrupt', () => {
@@ -415,5 +448,44 @@ describe('normalizeTasks', () => {
     expect(normalized[0].subtasks).toEqual([
       { id: 's1', title: 'Sub', description: '', done: true },
     ]);
+  });
+});
+
+describe('parseStoredTasks', () => {
+  test('normalizes a versioned payload', () => {
+    const parsed = parseStoredTasks(
+      JSON.stringify({
+        version: 1,
+        tasks: [{ id: 'x', title: 'X', done: 'yes' }],
+      }),
+    );
+    expect(parsed).toEqual([
+      { id: 'x', title: 'X', description: '', done: true, subtasks: [] },
+    ]);
+  });
+
+  test('still accepts the legacy bare‑array payload', () => {
+    const parsed = parseStoredTasks(
+      JSON.stringify([{ id: 'x', title: 'X', done: false }]),
+    );
+    expect(parsed).toEqual([
+      { id: 'x', title: 'X', description: '', done: false, subtasks: [] },
+    ]);
+  });
+
+  test('returns an empty list for invalid JSON', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(parseStoredTasks('{not valid json')).toEqual([]);
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test('returns an empty list when no task list is stored', () => {
+    expect(parseStoredTasks(JSON.stringify({ version: 1 }))).toEqual([]);
+    expect(parseStoredTasks(JSON.stringify('hello'))).toEqual([]);
+    expect(parseStoredTasks(JSON.stringify(null))).toEqual([]);
   });
 });

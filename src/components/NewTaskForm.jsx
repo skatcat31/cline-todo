@@ -67,6 +67,7 @@ export default function NewTaskForm({ onAddTask, titleFieldRef }) {
             onChange={(e) => setDue(e.target.value)}
             fullWidth
             margin="normal"
+            slotProps={{ inputLabel: { shrink: true } }}
           />
           <Button type="submit" variant="contained" sx={{ mt: 1 }}>
             Add Task

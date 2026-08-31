@@ -41,7 +41,7 @@ describe('parseTasksFile', () => {
 });
 
 describe('downloadTasks', () => {
-  test('creates a blob URL, clicks a download anchor and revokes the URL', async () => {
+  test('creates a blob URL, clicks a download anchor and defers revoking the URL', async () => {
     let createdBlob;
     const createObjectURL = vi.fn((blob) => {
       createdBlob = blob;
@@ -52,15 +52,21 @@ describe('downloadTasks', () => {
     const clickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => {});
+    vi.useFakeTimers();
     try {
       downloadTasks(
         [{ id: 'a', title: 'A', done: true, subtasks: [] }],
         'export.json',
       );
       expect(clickSpy).toHaveBeenCalledTimes(1);
+      // The URL must not be revoked synchronously – the download starts
+      // asynchronously, so an immediate revoke could cancel it.
+      expect(revokeObjectURL).not.toHaveBeenCalled();
       expect(JSON.parse(await createdBlob.text())).toHaveLength(1);
+      vi.advanceTimersByTime(1000);
       expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
     } finally {
+      vi.useRealTimers();
       clickSpy.mockRestore();
       vi.unstubAllGlobals();
     }

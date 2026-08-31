@@ -1,5 +1,11 @@
 import App from './App';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Compatibility layer for jest-dom with Vitest
 import '@testing-library/jest-dom/vitest';
@@ -968,7 +974,9 @@ test('remembers the selected filter across reloads', async () => {
 
 /**
  * "Export tasks" downloads the list as a JSON file. jsdom does not implement
- * URL.createObjectURL or anchor navigation, so both are stubbed.
+ * URL.createObjectURL or anchor navigation, so both are stubbed. The blob
+ * URL is revoked after a short delay (downloads start asynchronously in
+ * some browsers), so the test advances fake timers before asserting.
  */
 test('exports the task list as a JSON file', async () => {
   render(<App />);
@@ -987,14 +995,21 @@ test('exports the task list as a JSON file', async () => {
   const clickSpy = vi
     .spyOn(HTMLAnchorElement.prototype, 'click')
     .mockImplementation(() => {});
+  vi.useFakeTimers();
   try {
-    await userEvent.click(screen.getByRole('button', { name: 'Export tasks' }));
+    // fireEvent (not userEvent): user‑event schedules its pointer events
+    // through internal timers, which would never fire under fake timers.
+    fireEvent.click(screen.getByRole('button', { name: 'Export tasks' }));
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     const exported = JSON.parse(await createdBlob.text());
     expect(exported).toHaveLength(1);
     expect(exported[0]).toMatchObject({ title: 'Task A', done: false });
+    // The revoke is deferred, not synchronous with the click.
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
     expect(revokeObjectURL).toHaveBeenCalledTimes(1);
   } finally {
+    vi.useRealTimers();
     clickSpy.mockRestore();
   }
 });

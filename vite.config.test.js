@@ -39,4 +39,7 @@ test('the service worker precaches the app shell for offline use', () => {
   expect(patterns).toMatch(/css/);
   // The self‑hosted fonts need to survive a disconnect too.
   expect(patterns).toMatch(/woff2/);
+  // The install icons (public/icons/*.png) must survive offline, too, so an
+  // installed app does not fall back to a generic icon after a disconnect.
+  expect(patterns).toMatch(/png/);
 });

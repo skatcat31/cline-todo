@@ -47,9 +47,10 @@ export const pwaOptions = {
   },
   workbox: {
     // Precache the app shell so it loads offline – including the
-    // self‑hosted font files, so the Material typography survives a
-    // disconnect too.
-    globPatterns: ['**/*.{js,css,html,webmanifest,svg,woff2}'],
+    // self‑hosted font files (so the Material typography survives a
+    // disconnect) and the PNG app icons (so an installed app keeps its
+    // icons while offline).
+    globPatterns: ['**/*.{js,css,html,webmanifest,svg,woff2,png}'],
   },
 };
 

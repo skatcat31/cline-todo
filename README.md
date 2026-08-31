@@ -1,6 +1,6 @@
 # agentic-todo
 
-A To‑Do list application built with React 19, Vite and Material UI (MUI 7).
+A To‑Do list application built with React 19, Vite and Material UI (MUI 9).
 Tasks can have nested subtasks, and the whole list is persisted in the
 browser's `localStorage`.
 
@@ -27,10 +27,10 @@ browser's `localStorage`.
 
 | Concern     | Choice                                                                     |
 | ----------- | -------------------------------------------------------------------------- |
-| UI          | React 19, MUI 7 (direct‑path imports), Emotion                             |
+| UI          | React 19, MUI 9 (direct‑path imports), Emotion                             |
 | Build       | Vite 8, PWA via vite‑plugin‑pwa                                            |
 | Tests       | Vitest 4, Testing Library, jsdom (80% coverage thresholds), Playwright E2E |
-| Lint/format | ESLint 9 (flat config), Prettier                                           |
+| Lint/format | ESLint 10 (flat config), Prettier                                          |
 | CI/CD       | GitHub Actions → GitHub Pages                                              |
 | Container   | Multi‑stage Docker build (Node → nginx)                                    |
 

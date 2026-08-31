@@ -70,10 +70,11 @@ jobs:
         run: npx playwright test
 
   # Publish the built app to GitHub Pages (main branch only). The gh-pages
-  # branch is the Pages source for this repository.
+  # branch is the Pages source for this repository. Deployment is gated on
+  # the e2e job as well, so a broken user flow never reaches the live site.
   deploy:
     runs-on: ubuntu-latest
-    needs: ci
+    needs: [ci, e2e]
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout repository

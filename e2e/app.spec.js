@@ -58,3 +58,36 @@ test('shows the due date of a task', async ({ page }) => {
   await expect(page.getByRole('listitem', { name: 'Plan trip' })).toBeVisible();
   await expect(page.getByText('Due May 1, 2999')).toBeVisible();
 });
+
+test('undoes several deletions in reverse order', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Title').fill('First task');
+  await page.getByRole('button', { name: 'Add Task' }).click();
+  await page.getByLabel('Title').fill('Second task');
+  await page.getByRole('button', { name: 'Add Task' }).click();
+
+  await page
+    .getByRole('listitem', { name: 'First task' })
+    .getByRole('button', { name: 'Delete task' })
+    .click();
+  await page
+    .getByRole('listitem', { name: 'Second task' })
+    .getByRole('button', { name: 'Delete task' })
+    .click();
+  // The snackbar offers the latest delete
+  await expect(page.getByText('Deleted "Second task"')).toBeVisible();
+
+  // Undo once: the most recent delete comes back…
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(
+    page.getByRole('listitem', { name: 'Second task' }),
+  ).toBeVisible();
+  await expect(page.getByRole('listitem', { name: 'First task' })).toHaveCount(
+    0,
+  );
+  // …and again: the earlier delete
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(
+    page.getByRole('listitem', { name: 'First task' }),
+  ).toBeVisible();
+});

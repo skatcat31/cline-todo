@@ -1,6 +1,6 @@
 // List behaviour: filtering, search, reordering, undo and "clear completed".
 import App from './App';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Compatibility layer for jest-dom with Vitest
 import '@testing-library/jest-dom/vitest';
@@ -120,6 +120,164 @@ test('undo restores a deleted task at its original position', async () => {
   const items = screen.getAllByRole('listitem');
   expect(items[0]).toHaveAccessibleName('Task A');
   expect(items[1]).toHaveAccessibleName('Task B');
+});
+
+/**
+ * Multi‑level undo: each deletion pushes an entry onto a stack (most
+ * recent last), so several deletions can be undone one by one – the
+ * snackbar walks back through the stack and closes once it is empty.
+ */
+test('multiple deletions are undone one by one, most recent first', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  await userEvent.click(
+    within(screen.getByRole('listitem', { name: 'Task A' })).getByRole(
+      'button',
+      { name: 'Delete task' },
+    ),
+  );
+  await userEvent.click(
+    within(screen.getByRole('listitem', { name: 'Task B' })).getByRole(
+      'button',
+      { name: 'Delete task' },
+    ),
+  );
+  // The snackbar offers the *latest* delete
+  expect(await screen.findByText('Deleted "Task B"')).toBeInTheDocument();
+
+  // Undo once: the most recent delete (Task B) is restored, and the
+  // snackbar now offers the earlier one (Task A).
+  await userEvent.click(screen.getByRole('button', { name: /^undo$/i }));
+  expect(screen.getByText('Task B')).toBeInTheDocument();
+  expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+  expect(await screen.findByText('Deleted "Task A"')).toBeInTheDocument();
+
+  // Undo again: Task A comes back at its original position and the
+  // snackbar closes.
+  await userEvent.click(screen.getByRole('button', { name: /^undo$/i }));
+  const items = screen.getAllByRole('listitem');
+  expect(items[0]).toHaveAccessibleName('Task A');
+  expect(items[1]).toHaveAccessibleName('Task B');
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: /^undo$/i }),
+    ).not.toBeInTheDocument(),
+  );
+});
+
+test('undo works in reverse order across mixed actions (clear completed then delete)', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task C');
+  await userEvent.click(addTaskBtn);
+
+  // Complete A and B, then clear them (first stack entry)
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task A' }));
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Task B' }));
+  await userEvent.click(
+    screen.getByRole('button', { name: /clear completed/i }),
+  );
+  expect(await screen.findByText('Deleted 2 tasks')).toBeInTheDocument();
+
+  // Delete C (newer stack entry)
+  await userEvent.click(
+    within(screen.getByRole('listitem', { name: 'Task C' })).getByRole(
+      'button',
+      { name: 'Delete task' },
+    ),
+  );
+  expect(await screen.findByText('Deleted "Task C"')).toBeInTheDocument();
+
+  // Undo the delete first…
+  await userEvent.click(screen.getByRole('button', { name: /^undo$/i }));
+  expect(screen.getByText('Task C')).toBeInTheDocument();
+  expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+  // …then undo the clear
+  await userEvent.click(screen.getByRole('button', { name: /^undo$/i }));
+  const items = screen.getAllByRole('listitem');
+  expect(items[0]).toHaveAccessibleName('Task A');
+  expect(items[1]).toHaveAccessibleName('Task B');
+  expect(items[2]).toHaveAccessibleName('Task C');
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: /^undo$/i }),
+    ).not.toBeInTheDocument(),
+  );
+});
+
+test('the undo stack keeps only the most recent five deletions', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  for (const name of ['T1', 'T2', 'T3', 'T4', 'T5', 'T6']) {
+    await userEvent.type(titleInput, name);
+    await userEvent.click(addTaskBtn);
+  }
+  for (const name of ['T1', 'T2', 'T3', 'T4', 'T5', 'T6']) {
+    await userEvent.click(
+      within(screen.getByRole('listitem', { name })).getByRole('button', {
+        name: 'Delete task',
+      }),
+    );
+  }
+  // Undo five times: the most recent five deletions come back (T6…T2)
+  for (const name of ['T6', 'T5', 'T4', 'T3', 'T2']) {
+    await userEvent.click(screen.getByRole('button', { name: /^undo$/i }));
+    expect(screen.getByText(name)).toBeInTheDocument();
+  }
+  // The first delete (T1) was dropped from the full stack
+  expect(screen.queryByText('T1')).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: /^undo$/i }),
+    ).not.toBeInTheDocument(),
+  );
+});
+
+test('pressing Escape discards all pending undos', async () => {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+
+  await userEvent.click(
+    within(screen.getByRole('listitem', { name: 'Task A' })).getByRole(
+      'button',
+      { name: 'Delete task' },
+    ),
+  );
+  await userEvent.click(
+    within(screen.getByRole('listitem', { name: 'Task B' })).getByRole(
+      'button',
+      { name: 'Delete task' },
+    ),
+  );
+  expect(await screen.findByText('Deleted "Task B"')).toBeInTheDocument();
+
+  // Dismiss the snackbar via the Escape key
+  await userEvent.keyboard('{Escape}');
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: /^undo$/i }),
+    ).not.toBeInTheDocument(),
+  );
+  // No undo is offered anymore and both tasks stay gone
+  expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+  expect(screen.queryByText('Task B')).not.toBeInTheDocument();
 });
 
 /**

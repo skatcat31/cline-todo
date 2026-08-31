@@ -7,7 +7,8 @@ browser's `localStorage`.
 ## Features
 
 - Add, edit and delete tasks with optional descriptions – deletions (and
-  "Clear completed") offer an "Undo" snackbar
+  "Clear completed") offer an "Undo" snackbar; it remembers the last five
+  deletions and undoes them one by one, most recent first
 - Add, edit, complete and delete nested subtasks, with per‑task progress
   ("2 of 5 subtasks done")
 - Filter the list by status (All / Active / Completed) – the selection is

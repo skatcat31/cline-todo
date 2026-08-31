@@ -4,7 +4,14 @@ import { downloadTasks, parseTasksFile, tasksToJson } from './taskFile.js';
 describe('tasksToJson', () => {
   test('serializes the task list as pretty‑printed JSON', () => {
     const tasks = [
-      { id: 'a', title: 'A', description: '', done: false, subtasks: [] },
+      {
+        id: 'a',
+        title: 'A',
+        description: '',
+        due: '2026-09-10',
+        done: false,
+        subtasks: [],
+      },
     ];
     expect(JSON.parse(tasksToJson(tasks))).toEqual(tasks);
     expect(tasksToJson(tasks)).toContain('\n');
@@ -17,7 +24,14 @@ describe('parseTasksFile', () => {
       JSON.stringify([{ id: 'x', title: 'X', done: 'yes' }]),
     );
     expect(parsed).toEqual([
-      { id: 'x', title: 'X', description: '', done: true, subtasks: [] },
+      {
+        id: 'x',
+        title: 'X',
+        description: '',
+        due: null,
+        done: true,
+        subtasks: [],
+      },
     ]);
   });
 
@@ -35,13 +49,30 @@ describe('parseTasksFile', () => {
     expect(
       parseTasksFile(JSON.stringify(['junk', { id: 'x', title: 'X' }])),
     ).toEqual([
-      { id: 'x', title: 'X', description: '', done: false, subtasks: [] },
+      {
+        id: 'x',
+        title: 'X',
+        description: '',
+        due: null,
+        done: false,
+        subtasks: [],
+      },
     ]);
+  });
+
+  test('keeps a valid due date and drops an invalid one on import', () => {
+    const parsed = parseTasksFile(
+      JSON.stringify([
+        { id: 'a', title: 'A', due: '2026-09-10' },
+        { id: 'b', title: 'B', due: 'not-a-date' },
+      ]),
+    );
+    expect(parsed.map((task) => task.due)).toEqual(['2026-09-10', null]);
   });
 });
 
 describe('downloadTasks', () => {
-  test('creates a blob URL, clicks a download anchor and revokes the URL', async () => {
+  test('creates a blob URL, clicks a download anchor and defers revoking the URL', async () => {
     let createdBlob;
     const createObjectURL = vi.fn((blob) => {
       createdBlob = blob;
@@ -52,15 +83,21 @@ describe('downloadTasks', () => {
     const clickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => {});
+    vi.useFakeTimers();
     try {
       downloadTasks(
         [{ id: 'a', title: 'A', done: true, subtasks: [] }],
         'export.json',
       );
       expect(clickSpy).toHaveBeenCalledTimes(1);
+      // The URL must not be revoked synchronously – the download starts
+      // asynchronously, so an immediate revoke could cancel it.
+      expect(revokeObjectURL).not.toHaveBeenCalled();
       expect(JSON.parse(await createdBlob.text())).toHaveLength(1);
+      vi.advanceTimersByTime(1000);
       expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
     } finally {
+      vi.useRealTimers();
       clickSpy.mockRestore();
       vi.unstubAllGlobals();
     }

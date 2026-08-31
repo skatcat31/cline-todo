@@ -10,23 +10,31 @@ import Typography from '@mui/material/Typography';
 import AddCircleOutlined from '@mui/icons-material/AddCircleOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
+import ArrowUpward from '@mui/icons-material/ArrowUpward';
+import ArrowDownward from '@mui/icons-material/ArrowDownward';
 import SubtaskItem from './SubtaskItem.jsx';
 import SubtaskForm from './SubtaskForm.jsx';
+import { dueBadge } from '../utils/dates.js';
 
 /**
- * Renders a single task, its description, its subtasks and the UI for adding
- * a subtask. The subtask form state is owned by this component (via
- * `SubtaskForm`), so no form state is hoisted to the app level.
+ * Renders a single task, its description, its due date, its subtasks and
+ * the UI for adding a subtask. The subtask form state is owned by this
+ * component (via `SubtaskForm`), so no form state is hoisted to the app
+ * level.
  * Props:
- *   task - the task object {id, title, description, done, subtasks}
+ *   task - the task object {id, title, description, due, done, subtasks}
  *   onToggleDone - toggles the task's done state (receives the task id)
  *   onDelete - deletes the task (receives the task id)
- *   onEdit - updates the task (receives id and {title, description})
+ *   onEdit - updates the task (receives id and {title, description, due})
  *   onAddSubtask - adds a subtask (receives the parent id and
  *                  {title, description}); returns the created subtask's id
  *   onToggleSubtask - toggles a subtask's done state (receives parent and subtask ids)
  *   onDeleteSubtask - deletes a subtask (receives parent and subtask ids)
  *   onEditSubtask - updates a subtask (receives parent, subtask id and {title, description})
+ *   onMoveUp - move this task one row up in the visible list
+ *   onMoveDown - move this task one row down in the visible list
+ *   canMoveUp - whether a row exists above this one (disables the up button)
+ *   canMoveDown - whether a row exists below this one (disables the down button)
  *   focusToken - a changing, non-null token that moves focus to this
  *                task's checkbox (the parent sets it for the task that
  *                now occupies a just-deleted task's position; a token
@@ -41,11 +49,16 @@ export default function TaskItem({
   onToggleSubtask,
   onDeleteSubtask,
   onEditSubtask,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
   focusToken = null,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const [draftDescription, setDraftDescription] = useState('');
+  const [draftDue, setDraftDue] = useState('');
   // Whether the inline "add subtask" form is open for this task.
   const [subtaskFormOpen, setSubtaskFormOpen] = useState(false);
   // Id of the subtask that should receive focus after it has been added.
@@ -59,9 +72,11 @@ export default function TaskItem({
     }
   }, [focusToken]);
 
+  const badge = dueBadge(task);
   const startEdit = () => {
     setDraftTitle(task.title);
     setDraftDescription(task.description || '');
+    setDraftDue(task.due || '');
     setIsEditing(true);
   };
 
@@ -70,7 +85,11 @@ export default function TaskItem({
   const saveEdit = (e) => {
     e.preventDefault();
     if (!draftTitle.trim()) return;
-    onEdit(task.id, { title: draftTitle, description: draftDescription });
+    onEdit(task.id, {
+      title: draftTitle,
+      description: draftDescription,
+      due: draftDue || null,
+    });
     setIsEditing(false);
   };
 
@@ -120,6 +139,18 @@ export default function TaskItem({
               {task.description}
             </Typography>
           )}
+          {/* Due date: highlighted when the task is overdue or due today */}
+          {badge && (
+            <Typography
+              variant="caption"
+              color={
+                badge.severity === 'default' ? 'text.secondary' : badge.severity
+              }
+              sx={{ display: 'block', mt: 0.25 }}
+            >
+              {badge.text}
+            </Typography>
+          )}
         </Box>
       </Box>
 
@@ -137,7 +168,8 @@ export default function TaskItem({
         </Typography>
       )}
 
-      {/* Action row: Material icon buttons for adding a subtask, editing and deleting */}
+      {/* Action row: Material icon buttons for adding a subtask, editing,
+          deleting and reordering */}
       <Box
         sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 5, mt: 0.5 }}
       >
@@ -158,6 +190,22 @@ export default function TaskItem({
           onClick={() => onDelete(task.id)}
         >
           <DeleteOutlined fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          aria-label="Move task up"
+          disabled={!canMoveUp}
+          onClick={onMoveUp}
+        >
+          <ArrowUpward fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          aria-label="Move task down"
+          disabled={!canMoveDown}
+          onClick={onMoveDown}
+        >
+          <ArrowDownward fontSize="small" />
         </IconButton>
       </Box>
 
@@ -187,6 +235,15 @@ export default function TaskItem({
             label="Edit Description (optional)"
             value={draftDescription}
             onChange={(e) => setDraftDescription(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            id={`edit-due-${task.id}`}
+            label="Edit Due Date (optional)"
+            type="date"
+            value={draftDue}
+            onChange={(e) => setDraftDue(e.target.value)}
             fullWidth
             margin="normal"
           />

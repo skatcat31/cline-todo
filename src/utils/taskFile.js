@@ -24,7 +24,11 @@ export function downloadTasks(tasks, filename = 'todo-tasks.json') {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  // Defer the revocation: the download starts asynchronously in some
+  // browsers (notably Safari), so revoking the blob URL immediately after
+  // the click can cancel it. Giving the browser a moment keeps the download
+  // alive while still releasing the URL shortly after.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**

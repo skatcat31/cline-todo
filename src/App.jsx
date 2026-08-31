@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -20,41 +20,39 @@ import FileUpload from '@mui/icons-material/FileUpload';
 import FilterBar from './components/FilterBar.jsx';
 import NewTaskForm from './components/NewTaskForm.jsx';
 import Placeholder from './components/Placeholder.jsx';
+import SearchBar from './components/SearchBar.jsx';
 import TaskItem from './components/TaskItem.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
+import { useColorScheme } from './hooks/useColorScheme.js';
 import { usePersistentState } from './hooks/usePersistentState.js';
 import { useTasks } from './hooks/useTasks.js';
-import { createAppTheme } from './theme.js';
 import { FILTERS } from './utils/filters.js';
 import { downloadTasks, parseTasksFile } from './utils/taskFile.js';
+import {
+  completedItems,
+  indexOfTask,
+  mergeTasks,
+  tasksMatching,
+  taskCounts,
+  visibleTasks,
+} from './utils/taskList.js';
 
 // localStorage key under which the active filter is remembered (the legal
 // values are the entries of FILTERS, imported from utils/filters.js;
 // anything else falls back to "all").
 const FILTER_KEY = 'todo-filter';
 
-// localStorage key for the color scheme preference.
-const THEME_KEY = 'todo-theme';
+// How many deletion actions the undo snackbar remembers (multi‑level
+// undo): new actions push onto the end of the stack and the oldest one is
+// dropped once the limit is reached.
+const UNDO_LIMIT = 5;
 
-/**
- * Initial color scheme: an explicit user choice wins; otherwise follow the
- * OS preference when the browser exposes it; default to light.
- */
-function initialThemeMode() {
-  try {
-    const stored = localStorage.getItem(THEME_KEY);
-    if (stored === 'light' || stored === 'dark') return stored;
-  } catch {
-    // storage unavailable – fall through
-  }
-  if (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  ) {
-    return 'dark';
-  }
-  return 'light';
-}
+// The snackbar message for a stack entry (a single delete names the
+// task, bulk removals use a count).
+const undoDescription = (items) =>
+  items.length === 1
+    ? `Deleted "${items[0].task.title}"`
+    : `Deleted ${items.length} tasks`;
 
 // A simple To Do application allowing users to add tasks with a title and
 // description. Task state, mutations and persistence live in the `useTasks`
@@ -66,6 +64,7 @@ function App() {
     addTask,
     toggleTask,
     deleteTask,
+    moveTask,
     insertTasks,
     editTask,
     addSubtask,
@@ -86,10 +85,32 @@ function App() {
       return 'all';
     }
   });
-  // Tasks (with their original positions) that can still be undone: one
-  // entry per removed task, so both single deletes and "clear completed"
-  // offer an undo from the snackbar. `null` means nothing to undo.
-  const [pendingUndo, setPendingUndo] = useState(null);
+  // The current search query: a transient view filter (title, description
+  // or subtask title), unlike the status filter it is not persisted.
+  const [search, setSearch] = useState('');
+  // Stack of undoable actions (oldest first): each entry holds the removed
+  // tasks (with their original positions) and its snackbar description.
+  // Single deletes and "clear completed" push an entry; "Undo" pops the
+  // most recent one, so up to UNDO_LIMIT actions can be undone in
+  // sequence. An empty stack means nothing to undo.
+  const [undoStack, setUndoStack] = useState([]);
+  // Monotonically increasing stamp for stack entries: the snackbar is
+  // keyed on the latest stamp so each new entry restarts its auto‑hide
+  // timer.
+  const undoSeq = useRef(0);
+
+  // Push an undoable action onto the stack, dropping the oldest entry
+  // once the limit is reached.
+  const pushUndo = (items) => {
+    undoSeq.current += 1;
+    const stamp = undoSeq.current;
+    setUndoStack((prev) => {
+      const next = [...prev, { items, stamp }];
+      return next.length > UNDO_LIMIT
+        ? next.slice(next.length - UNDO_LIMIT)
+        : next;
+    });
+  };
   // A valid import waiting for the user’s decision (replace or merge);
   // `null` means the confirmation dialog is closed.
   const [pendingImport, setPendingImport] = useState(null);
@@ -105,18 +126,15 @@ function App() {
   const [focusTask, setFocusTask] = useState(null);
   // Hidden file input used by the "Import tasks" button.
   const fileInputRef = useRef(null);
-  // Color scheme: "light" or "dark" – remembered in localStorage (via
-  // usePersistentState); the lazy initializer picks an explicit user
-  // choice, then the OS preference, then light (see initialThemeMode).
-  const [mode, setMode] = usePersistentState(THEME_KEY, initialThemeMode);
-
-  // Build the theme only when the mode actually changes.
-  const theme = useMemo(() => createAppTheme(mode), [mode]);
+  // Color scheme: "light", "system" (follow the OS) or "dark"; the hook
+  // persists the choice, tracks the OS preference live in "system" mode and
+  // hands back the concrete MUI theme for the effective scheme.
+  const { mode, setMode, theme } = useColorScheme();
 
   // Handle adding a new top‑level task (NewTaskForm owns the draft
   // fields and calls this with their values).
-  const handleAddTask = ({ title, description }) => {
-    addTask(title, description);
+  const handleAddTask = ({ title, description, due }) => {
+    addTask(title, description, due);
   };
 
   // Delete a task but remember it (with its position) so the snackbar can
@@ -125,11 +143,11 @@ function App() {
   // focuses its own checkbox when focusToken points at it), or to the
   // new‑task title field when the list becomes empty.
   const handleDeleteTask = (id) => {
-    const index = tasks.findIndex((task) => task.id === id);
+    const index = indexOfTask(tasks, id);
     const task = tasks[index];
     const remaining = tasks.filter((t) => t.id !== id);
     deleteTask(id);
-    setPendingUndo({ items: [{ task, index }] });
+    pushUndo([{ task, index }]);
     const target = remaining[Math.min(index, remaining.length - 1)];
     if (target) {
       setFocusTask({ id: target.id, stamp: Date.now() });
@@ -140,23 +158,43 @@ function App() {
     }
   };
 
-  // Re‑insert all undone tasks at their original positions.
+  // Re‑insert the most recently removed tasks (the newest stack entry,
+  // the last one) and keep the earlier entries, so several deletions can
+  // be undone in sequence (most recent one first).
   const handleUndo = () => {
-    if (!pendingUndo) return;
-    insertTasks(pendingUndo.items);
-    setPendingUndo(null);
+    if (undoStack.length === 0) return;
+    const latest = undoStack[undoStack.length - 1];
+    insertTasks(latest.items);
+    setUndoStack(undoStack.slice(0, -1));
   };
 
-  const closeUndoSnackbar = () => setPendingUndo(null);
+  // Move a task one row up/down within the *currently visible* list (the
+  // filter may hide other tasks, so the neighbour is computed on the shown
+  // list, not the full list – the reducer swaps the two full-list entries).
+  const handleMoveTask = (id, direction) => {
+    const position = shownTasks.findIndex((task) => task.id === id);
+    if (direction === 'up' && position > 0) {
+      moveTask(id, shownTasks[position - 1].id);
+    } else if (direction === 'down' && position < shownTasks.length - 1) {
+      moveTask(id, shownTasks[position + 1].id);
+    }
+  };
+
+  // Dismiss the undo snackbar and clear the stack. Auto‑hide and Escape
+  // discard the pending undos; a click anywhere else in the app (reason
+  // "clickaway") must NOT discard them – the user is just working on (or
+  // deleting) more tasks.
+  const closeUndoSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setUndoStack([]);
+  };
 
   // Remove every completed task and remember it (with its position) so
   // the snackbar can offer an undo, like for single deletes.
   const handleClearCompleted = () => {
-    const removed = tasks
-      .map((task, index) => ({ task, index }))
-      .filter(({ task }) => task.done);
+    const removed = completedItems(tasks);
     clearCompleted();
-    if (removed.length > 0) setPendingUndo({ items: removed });
+    if (removed.length > 0) pushUndo(removed);
   };
 
   // Open the hidden file picker for importing a task list.
@@ -204,24 +242,18 @@ function App() {
   // overwrites.
   const handleImportMerge = () => {
     if (!pendingImport) return;
-    const existingIds = new Set(tasks.map((task) => task.id));
-    const merged = [
-      ...tasks,
-      ...pendingImport.filter((task) => !existingIds.has(task.id)),
-    ];
-    replaceTasks(merged);
+    replaceTasks(mergeTasks(tasks, pendingImport));
     setPendingImport(null);
   };
 
-  // The task list as shown by the active filter
-  const visibleTasks =
-    filter === 'all'
-      ? tasks
-      : tasks.filter((task) =>
-          filter === 'completed' ? task.done : !task.done,
-        );
-  const activeCount = tasks.filter((task) => !task.done).length;
-  const completedCount = tasks.length - activeCount;
+  // The task list as shown by the search query and the active filter, plus
+  // the counters the filter bar shows (pure helpers from utils/taskList.js).
+  const shownTasks = visibleTasks(tasksMatching(tasks, search), filter);
+  const {
+    active: activeCount,
+    completed: completedCount,
+    total: totalCount,
+  } = taskCounts(tasks);
 
   return (
     <ThemeProvider theme={theme}>
@@ -254,11 +286,9 @@ function App() {
             >
               <FileUpload fontSize="small" />
             </IconButton>
-            {/* Light/dark color‑scheme toggle; the choice is persisted */}
-            <ThemeToggle
-              mode={mode}
-              onToggle={() => setMode(mode === 'light' ? 'dark' : 'light')}
-            />
+            {/* Color‑scheme selector (light / system / dark); the choice is
+                persisted by useColorScheme */}
+            <ThemeToggle mode={mode} onModeChange={setMode} />
             <input
               ref={fileInputRef}
               type="file"
@@ -281,6 +311,12 @@ function App() {
             titleFieldRef={titleInputRef}
           />
 
+          {/* Search box: filters the list by title, description or
+              subtask title (only shown while tasks exist) */}
+          {tasks.length > 0 && (
+            <SearchBar value={search} onSearchChange={setSearch} />
+          )}
+
           {/* Filter bar: All / Active / Completed, a counter and
             "clear completed" (only shown while tasks exist) */}
           {tasks.length > 0 && (
@@ -288,7 +324,7 @@ function App() {
               filter={filter}
               onFilterChange={setFilter}
               activeCount={activeCount}
-              totalCount={tasks.length}
+              totalCount={totalCount}
               completedCount={completedCount}
               onClearCompleted={handleClearCompleted}
             />
@@ -298,24 +334,26 @@ function App() {
           {tasks.length === 0 && <Placeholder />}
 
           {/* Hint when the active filter has no matching tasks */}
-          {tasks.length > 0 && visibleTasks.length === 0 && (
+          {tasks.length > 0 && shownTasks.length === 0 && (
             <Typography
               variant="body1"
               color="text.secondary"
               sx={{ my: 3, textAlign: 'center' }}
             >
-              {filter === 'active'
-                ? 'No active tasks – nice work!'
-                : 'No completed tasks yet.'}
+              {search.trim()
+                ? `No tasks match "${search.trim()}".`
+                : filter === 'active'
+                  ? 'No active tasks – nice work!'
+                  : 'No completed tasks yet.'}
             </Typography>
           )}
 
           {/* List of tasks, presented on a shared paper surface with
             Material list dividers between items */}
-          {visibleTasks.length > 0 && (
+          {shownTasks.length > 0 && (
             <Card elevation={1} sx={{ mb: 3 }}>
               <List component="ul" disablePadding>
-                {visibleTasks.map((task) => (
+                {shownTasks.map((task, position) => (
                   <TaskItem
                     key={task.id}
                     task={task}
@@ -326,6 +364,10 @@ function App() {
                     onToggleSubtask={toggleSubtask}
                     onDeleteSubtask={deleteSubtask}
                     onEditSubtask={editSubtask}
+                    canMoveUp={position > 0}
+                    canMoveDown={position < shownTasks.length - 1}
+                    onMoveUp={() => handleMoveTask(task.id, 'up')}
+                    onMoveDown={() => handleMoveTask(task.id, 'down')}
                     focusToken={
                       focusTask && focusTask.id === task.id
                         ? focusTask.stamp
@@ -351,11 +393,18 @@ function App() {
           </Alert>
         </Snackbar>
 
-        {/* Undo prompt after a task was deleted: the task (and its position)
-          are kept in state and re‑inserted when "Undo" is pressed. The
-          snackbar auto‑disappears after a few seconds. */}
+        {/* Undo prompt after deletions: each removed task (or "clear
+          completed") pushes an entry onto a stack (most recent last);
+          "Undo" re‑inserts the newest entry and the snackbar then offers
+          the previous one until the stack is empty. The changing key
+          restarts the auto‑hide timer for every new entry. */}
         <Snackbar
-          open={Boolean(pendingUndo)}
+          key={
+            undoStack.length > 0
+              ? undoStack[undoStack.length - 1].stamp
+              : 'no-undo'
+          }
+          open={undoStack.length > 0}
           autoHideDuration={6000}
           onClose={closeUndoSnackbar}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
@@ -371,10 +420,8 @@ function App() {
               </Button>
             }
           >
-            {pendingUndo
-              ? pendingUndo.items.length === 1
-                ? `Deleted "${pendingUndo.items[0].task.title}"`
-                : `Deleted ${pendingUndo.items.length} tasks`
+            {undoStack.length > 0
+              ? undoDescription(undoStack[undoStack.length - 1].items)
               : ''}
           </Alert>
         </Snackbar>

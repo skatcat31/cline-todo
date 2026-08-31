@@ -8,10 +8,11 @@ import Typography from '@mui/material/Typography';
 
 /**
  * The "New Task" entry form, presented as a Material card. Owns the
- * draft field state (title, description); a successful submit reports
- * `{title, description}` to the parent and clears the fields.
+ * draft field state (title, description, optional due date); a
+ * successful submit reports `{title, description, due}` to the parent
+ * and clears the fields (`due` is `null` when left empty).
  * Props:
- *   onAddTask - called with {title, description} on submit
+ *   onAddTask - called with {title, description, due} on submit
  *   titleFieldRef - optional ref object that receives the title input
  *                   element (so the app can restore focus to it, e.g.
  *                   when the list becomes empty after a delete)
@@ -20,13 +21,15 @@ export default function NewTaskForm({ onAddTask, titleFieldRef }) {
   // Controlled input state for the new task
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [due, setDue] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAddTask({ title, description });
+    onAddTask({ title, description, due: due || null });
     setTitle('');
     setDescription('');
+    setDue('');
   };
 
   return (
@@ -53,6 +56,15 @@ export default function NewTaskForm({ onAddTask, titleFieldRef }) {
             placeholder="Task description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            id="due-date"
+            label="Due date (optional)"
+            type="date"
+            value={due}
+            onChange={(e) => setDue(e.target.value)}
             fullWidth
             margin="normal"
           />

@@ -2,7 +2,9 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import {
   STORAGE_KEY,
+  STORAGE_VERSION,
   normalizeTasks,
+  parseStoredTasks,
   tasksReducer,
   useTasks,
 } from './useTasks.js';
@@ -31,10 +33,43 @@ describe('useTasks', () => {
         id: 'stored-1',
         title: 'Stored task',
         description: '',
+        due: null,
         done: true,
         subtasks: [],
       },
     ]);
+  });
+
+  test('loads a versioned payload ({version, tasks}) from storage', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: STORAGE_VERSION,
+        tasks: [{ id: 'stored-1', title: 'Stored task', done: false }],
+      }),
+    );
+    const { result } = renderHook(() => useTasks());
+    expect(result.current.tasks).toEqual([
+      {
+        id: 'stored-1',
+        title: 'Stored task',
+        description: '',
+        due: null,
+        done: false,
+        subtasks: [],
+      },
+    ]);
+  });
+
+  test('persists the list as a versioned payload', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      result.current.addTask('Task A', '');
+    });
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    expect(stored.version).toBe(STORAGE_VERSION);
+    expect(stored.tasks).toHaveLength(1);
+    expect(stored.tasks[0]).toMatchObject({ title: 'Task A', done: false });
   });
 
   test('falls back to an empty list when the stored value is corrupt', () => {
@@ -166,6 +201,42 @@ describe('useTasks', () => {
     expect(result.current.tasks[1].done).toBe(false);
   });
 
+  test('addTask stores a valid due date and normalises invalid ones to null', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      result.current.addTask('With due', '', '2026-09-10');
+      result.current.addTask('Bad due', '', 'not a date');
+      result.current.addTask('No due', '');
+    });
+    expect(result.current.tasks[0].due).toBe('2026-09-10');
+    expect(result.current.tasks[1].due).toBeNull();
+    expect(result.current.tasks[2].due).toBeNull();
+  });
+
+  test('editTask updates the due date (including clearing it)', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      result.current.addTask('Task A', '', '2026-09-10');
+    });
+    const [firstTask] = result.current.tasks;
+    act(() => {
+      result.current.editTask(firstTask.id, {
+        title: 'Task A',
+        description: '',
+        due: '2026-10-01',
+      });
+    });
+    expect(result.current.tasks[0].due).toBe('2026-10-01');
+    act(() => {
+      result.current.editTask(firstTask.id, {
+        title: 'Task A',
+        description: '',
+        due: null,
+      });
+    });
+    expect(result.current.tasks[0].due).toBeNull();
+  });
+
   test('deleteTask removes the matching task', () => {
     const { result } = renderHook(() => useTasks());
     act(() => {
@@ -178,6 +249,24 @@ describe('useTasks', () => {
     });
     expect(result.current.tasks).toHaveLength(1);
     expect(result.current.tasks[0].title).toBe('Task B');
+  });
+
+  test('moveTask swaps a task with its neighbour', () => {
+    const { result } = renderHook(() => useTasks());
+    let taskA;
+    let taskB;
+    act(() => {
+      result.current.addTask('Task A', '');
+      result.current.addTask('Task B', '');
+    });
+    [taskA, taskB] = result.current.tasks;
+    act(() => {
+      result.current.moveTask(taskA.id, taskB.id);
+    });
+    expect(result.current.tasks.map((t) => t.title)).toEqual([
+      'Task B',
+      'Task A',
+    ]);
   });
 
   test('editTask updates the trimmed title and description', () => {
@@ -378,6 +467,38 @@ describe('tasksReducer', () => {
       }).map((t) => t.id),
     ).toEqual(['x', 'a', 'b']);
   });
+
+  test('move-task swaps the two tasks without mutating the state', () => {
+    const tasks = [
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+      { id: 'c', title: 'C', done: false, subtasks: [] },
+    ];
+    const after = tasksReducer(tasks, {
+      type: 'move-task',
+      id: 'a',
+      swapId: 'b',
+    });
+    expect(after.map((t) => t.id)).toEqual(['b', 'a', 'c']);
+    // The previous state array must not have been mutated.
+    expect(tasks.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('move-task leaves the list untouched for unknown or identical ids', () => {
+    const tasks = [
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+    ];
+    expect(
+      tasksReducer(tasks, { type: 'move-task', id: 'nope', swapId: 'b' }),
+    ).toBe(tasks);
+    expect(
+      tasksReducer(tasks, { type: 'move-task', id: 'a', swapId: 'nope' }),
+    ).toBe(tasks);
+    expect(
+      tasksReducer(tasks, { type: 'move-task', id: 'a', swapId: 'a' }),
+    ).toBe(tasks);
+  });
 });
 
 describe('normalizeTasks', () => {
@@ -395,7 +516,29 @@ describe('normalizeTasks', () => {
       { id: 't1', title: 'Task', done: 'yes', subtasks: 'nope' },
     ]);
     expect(normalized).toEqual([
-      { id: 't1', title: 'Task', description: '', done: true, subtasks: [] },
+      {
+        id: 't1',
+        title: 'Task',
+        description: '',
+        due: null,
+        done: true,
+        subtasks: [],
+      },
+    ]);
+  });
+
+  test('keeps a valid due date and drops an invalid one', () => {
+    const normalized = normalizeTasks([
+      { id: 'a', title: 'Valid', due: '2026-09-10' },
+      { id: 'b', title: 'Impossible date', due: '2026-02-30' },
+      { id: 'c', title: 'Wrong shape', due: 42 },
+      { id: 'd', title: 'No due' },
+    ]);
+    expect(normalized.map((task) => task.due)).toEqual([
+      '2026-09-10',
+      null,
+      null,
+      null,
     ]);
   });
 
@@ -415,5 +558,58 @@ describe('normalizeTasks', () => {
     expect(normalized[0].subtasks).toEqual([
       { id: 's1', title: 'Sub', description: '', done: true },
     ]);
+  });
+});
+
+describe('parseStoredTasks', () => {
+  test('normalizes a versioned payload', () => {
+    const parsed = parseStoredTasks(
+      JSON.stringify({
+        version: 1,
+        tasks: [{ id: 'x', title: 'X', done: 'yes' }],
+      }),
+    );
+    expect(parsed).toEqual([
+      {
+        id: 'x',
+        title: 'X',
+        description: '',
+        due: null,
+        done: true,
+        subtasks: [],
+      },
+    ]);
+  });
+
+  test('still accepts the legacy bare‑array payload', () => {
+    const parsed = parseStoredTasks(
+      JSON.stringify([{ id: 'x', title: 'X', done: false }]),
+    );
+    expect(parsed).toEqual([
+      {
+        id: 'x',
+        title: 'X',
+        description: '',
+        due: null,
+        done: false,
+        subtasks: [],
+      },
+    ]);
+  });
+
+  test('returns an empty list for invalid JSON', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(parseStoredTasks('{not valid json')).toEqual([]);
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test('returns an empty list when no task list is stored', () => {
+    expect(parseStoredTasks(JSON.stringify({ version: 1 }))).toEqual([]);
+    expect(parseStoredTasks(JSON.stringify('hello'))).toEqual([]);
+    expect(parseStoredTasks(JSON.stringify(null))).toEqual([]);
   });
 });

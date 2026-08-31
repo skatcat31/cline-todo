@@ -125,3 +125,7 @@ src/
 
 CI, Docker and the included `.nvmrc` all use Node 24 (LTS); the minimum
 supported version is 20.19 (see `engines` in `package.json`).
+
+## License
+
+Released under the [MIT License](./LICENSE).

@@ -243,3 +243,78 @@ test('reorders tasks by dragging them onto another row', async ({ page }) => {
   expect(await rows.nth(1).textContent()).toContain('Third');
   expect(await rows.nth(2).textContent()).toContain('First');
 });
+
+test('manages multiple task lists', async ({ page }) => {
+  await page.goto('/');
+  // A task in the default list…
+  await page.getByLabel('Title').fill('Personal task');
+  await page.getByRole('button', { name: 'Add Task' }).click();
+
+  // …then create and switch to a second list.
+  await page.getByRole('button', { name: 'New list' }).click();
+  await page.getByLabel('List name').fill('Work');
+  await page.getByRole('button', { name: 'Create list' }).click();
+  await expect(page.getByRole('tab', { name: 'Work' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+
+  await page.getByLabel('Title').fill('Work task');
+  await page.getByRole('button', { name: 'Add Task' }).click();
+  await expect(page.getByRole('listitem', { name: 'Work task' })).toBeVisible();
+  // The default list's task is not shown in the new list.
+  await expect(
+    page.getByRole('listitem', { name: 'Personal task' }),
+  ).toHaveCount(0);
+
+  // Switching back shows the original task…
+  await page.getByRole('tab', { name: 'To-Do' }).click();
+  await expect(
+    page.getByRole('listitem', { name: 'Personal task' }),
+  ).toBeVisible();
+
+  // …and both lists (plus the active one) survive a reload.
+  await page.reload();
+  await expect(page.getByRole('tab', { name: 'To-Do' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.getByRole('tab', { name: 'Work' }).click();
+  await expect(page.getByRole('listitem', { name: 'Work task' })).toBeVisible();
+});
+
+test('renames and deletes a list', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New list' }).click();
+  await page.getByLabel('List name').fill('Work');
+  await page.getByRole('button', { name: 'Create list' }).click();
+  await expect(page.getByRole('tab', { name: 'Work' })).toBeVisible();
+
+  // Rename via the list options menu (the input is pre‑filled).
+  await page.getByRole('button', { name: 'List options' }).click();
+  await page.getByRole('menuitem', { name: 'Rename list' }).click();
+  await page.getByLabel('List name').fill('Side projects');
+  await page.getByRole('button', { name: 'Rename list' }).click();
+  await expect(page.getByRole('tab', { name: 'Side projects' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Work' })).toHaveCount(0);
+
+  // Delete the renamed list again: confirm in the dialog.
+  await page.getByRole('button', { name: 'List options' }).click();
+  await page.getByRole('menuitem', { name: 'Delete list' }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Delete list' })
+    .click();
+  await expect(page.getByRole('tab', { name: 'Side projects' })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'To-Do' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+
+  // With only one list left, "Delete list" is disabled (MUI marks it with
+  // the Mui-disabled class and removes it from the tab order).
+  await page.getByRole('button', { name: 'List options' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Delete list' })).toHaveClass(
+    /Mui-disabled/,
+  );
+});

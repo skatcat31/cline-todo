@@ -69,8 +69,10 @@ test('persists tasks to localStorage as they change', async () => {
   await userEvent.click(screen.getByRole('button', { name: /add task/i }));
   const stored = JSON.parse(localStorage.getItem('tasks'));
   expect(stored.version).toBe(STORAGE_VERSION);
-  expect(stored.tasks).toHaveLength(1);
-  expect(stored.tasks[0]).toMatchObject({
+  expect(stored.activeListId).toBe('default');
+  expect(stored.lists).toHaveLength(1);
+  expect(stored.lists[0].tasks).toHaveLength(1);
+  expect(stored.lists[0].tasks[0]).toMatchObject({
     title: 'Persisted task',
     description: '',
     done: false,
@@ -118,4 +120,44 @@ test('remembers the selected filter across reloads', async () => {
     'aria-pressed',
     'true',
   );
+});
+
+/**
+ * A pre‑v2 payload (the versioned { version, tasks } shape from the
+ * single‑list era) is upgraded to the multi‑list state: the tasks are kept
+ * in a single "To‑Do" list and the app keeps working.
+ */
+test('upgrades a v1 single‑list payload to the multi‑list state', async () => {
+  localStorage.setItem(
+    'tasks',
+    JSON.stringify({
+      version: 1,
+      tasks: [
+        {
+          id: 'v1-1',
+          title: 'Legacy task',
+          description: '',
+          done: false,
+          subtasks: [],
+        },
+      ],
+    }),
+  );
+  render(<App />);
+  // The legacy task is shown under the default list…
+  expect(screen.getByRole('listitem', { name: 'Legacy task' })).toBeVisible();
+  expect(screen.getByRole('tab', { name: 'To-Do' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  // …and the next write stores the upgraded (multi‑list) payload.
+  await userEvent.type(screen.getByLabelText(/^title/i), 'New task');
+  await userEvent.click(screen.getByRole('button', { name: /add task/i }));
+  const stored = JSON.parse(localStorage.getItem('tasks'));
+  expect(stored.version).toBe(STORAGE_VERSION);
+  expect(stored.lists[0].name).toBe('To-Do');
+  expect(stored.lists[0].tasks.map((t) => t.title)).toEqual([
+    'Legacy task',
+    'New task',
+  ]);
 });

@@ -20,6 +20,7 @@ import FileUpload from '@mui/icons-material/FileUpload';
 import NotificationsActive from '@mui/icons-material/NotificationsActive';
 import NotificationsNone from '@mui/icons-material/NotificationsNone';
 import FilterBar from './components/FilterBar.jsx';
+import ListTabs from './components/ListTabs.jsx';
 import NewTaskForm from './components/NewTaskForm.jsx';
 import Placeholder from './components/Placeholder.jsx';
 import SearchBar from './components/SearchBar.jsx';
@@ -80,7 +81,13 @@ const undoDescription = (items) =>
 function App() {
   const {
     tasks,
+    lists,
+    activeListId,
     persistFailed,
+    addList,
+    renameList,
+    deleteList,
+    selectList,
     addTask,
     toggleTask,
     deleteTask,
@@ -141,12 +148,14 @@ function App() {
   const undoSeq = useRef(0);
 
   // Push an undoable action onto the stack, dropping the oldest entry
-  // once the limit is reached.
-  const pushUndo = (items) => {
+  // once the limit is reached. `listId` remembers which list the tasks
+  // came from, so undo can restore them there even if the user switched
+  // lists in the meantime.
+  const pushUndo = (items, listId) => {
     undoSeq.current += 1;
     const stamp = undoSeq.current;
     setUndoStack((prev) => {
-      const next = [...prev, { items, stamp }];
+      const next = [...prev, { items, listId, stamp }];
       return next.length > UNDO_LIMIT
         ? next.slice(next.length - UNDO_LIMIT)
         : next;
@@ -188,7 +197,7 @@ function App() {
     const task = tasks[index];
     const remaining = tasks.filter((t) => t.id !== id);
     deleteTask(id);
-    pushUndo([{ task, index }]);
+    pushUndo([{ task, index }], activeListId);
     const target = remaining[Math.min(index, remaining.length - 1)];
     if (target) {
       setFocusTask({ id: target.id, stamp: Date.now() });
@@ -205,7 +214,7 @@ function App() {
   const handleUndo = () => {
     if (undoStack.length === 0) return;
     const latest = undoStack[undoStack.length - 1];
-    insertTasks(latest.items);
+    insertTasks(latest.items, latest.listId);
     setUndoStack(undoStack.slice(0, -1));
   };
 
@@ -278,7 +287,7 @@ function App() {
   const handleClearCompleted = () => {
     const removed = completedItems(tasks);
     clearCompleted();
-    if (removed.length > 0) pushUndo(removed);
+    if (removed.length > 0) pushUndo(removed, activeListId);
   };
 
   // Open the hidden file picker for importing a task list.
@@ -412,6 +421,21 @@ function App() {
               onChange={handleImportChange}
             />
           </Toolbar>
+          {/* List tabs + list management (create / rename / delete); the
+              row is aligned with the content column below it. */}
+          <Box
+            component="nav"
+            sx={{ maxWidth: 640, mx: 'auto', px: { xs: 2, sm: 3 }, pb: 1 }}
+          >
+            <ListTabs
+              lists={lists}
+              activeListId={activeListId}
+              onSelect={selectList}
+              onAdd={addList}
+              onRename={renameList}
+              onDelete={deleteList}
+            />
+          </Box>
         </AppBar>
 
         {/* Main content surface, centered, using the 8pt spacing grid */}

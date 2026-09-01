@@ -98,7 +98,8 @@ test('import merging keeps existing tasks and adds the new ones', async () => {
   await userEvent.type(titleInput, 'Existing');
   await userEvent.click(screen.getByRole('button', { name: /add task/i }));
   // Read the generated id so the file can include a duplicate on purpose.
-  const existingId = JSON.parse(localStorage.getItem('tasks')).tasks[0].id;
+  const existingId = JSON.parse(localStorage.getItem('tasks')).lists[0].tasks[0]
+    .id;
 
   const file = new File(
     [

@@ -59,7 +59,54 @@ test('shows the due date of a task', async ({ page }) => {
   await expect(page.getByText('Due May 1, 2999')).toBeVisible();
 });
 
-test('sorts the list by due date and remembers the choice', async ({ page }) => {
+test('reminds about tasks that are due today', async ({ context }) => {
+  // Replace the Notification API with a recording stand‑in (permission
+  // pre‑granted) so the reminder flow is deterministic in headless mode.
+  await context.addInitScript(() => {
+    window.__notifications = [];
+    window.Notification = class {
+      static get permission() {
+        return 'granted';
+      }
+      static requestPermission() {
+        return Promise.resolve('granted');
+      }
+      constructor(title, options) {
+        window.__notifications.push({ title, body: options?.body });
+      }
+    };
+  });
+  const page = await context.newPage();
+  await page.goto('/');
+
+  // Add a task due today (local calendar date).
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+    2,
+    '0',
+  )}-${String(now.getDate()).padStart(2, '0')}`;
+  await page.getByLabel('Title').fill('Water the plants');
+  await page.getByLabel('Due date (optional)').fill(today);
+  await page.getByRole('button', { name: 'Add Task' }).click();
+
+  // Granted + enabled: the app‑bar button offers to turn the reminders off.
+  await expect(
+    page.getByRole('button', { name: 'Turn off due‑date reminders' }),
+  ).toBeVisible();
+
+  // …and a reminder was announced for the task due today.
+  await expect
+    .poll(async () => page.evaluate(() => window.__notifications.length))
+    .toBe(1);
+  expect(await page.evaluate(() => window.__notifications[0])).toEqual({
+    title: 'Task due today',
+    body: 'Water the plants',
+  });
+});
+
+test('sorts the list by due date and remembers the choice', async ({
+  page,
+}) => {
   await page.goto('/');
   const titleInput = page.getByLabel('Title');
   const dueInput = page.getByLabel('Due date (optional)');

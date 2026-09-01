@@ -2,13 +2,8 @@ import { useRef, useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CssBaseline from '@mui/material/CssBaseline';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import Snackbar from '@mui/material/Snackbar';
@@ -20,12 +15,16 @@ import FileUpload from '@mui/icons-material/FileUpload';
 import NotificationsActive from '@mui/icons-material/NotificationsActive';
 import NotificationsNone from '@mui/icons-material/NotificationsNone';
 import FilterBar from './components/FilterBar.jsx';
+import ImportDialog from './components/ImportDialog.jsx';
 import ListTabs from './components/ListTabs.jsx';
 import NewTaskForm from './components/NewTaskForm.jsx';
+import PersistWarning from './components/PersistWarning.jsx';
 import Placeholder from './components/Placeholder.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import TaskItem from './components/TaskItem.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
+import UndoSnackbar from './components/UndoSnackbar.jsx';
+import { SNACKBAR_SX } from './components/snackbarSx.js';
 import { useColorScheme } from './hooks/useColorScheme.js';
 import { useDueDateReminders } from './hooks/useDueDateReminders.js';
 import { usePersistentState } from './hooks/usePersistentState.js';
@@ -56,24 +55,6 @@ const SORT_KEY = 'todo-sort';
 // undo): new actions push onto the end of the stack and the oldest one is
 // dropped once the limit is reached.
 const UNDO_LIMIT = 5;
-
-// Shared style for the snackbars: a MUI snackbar's root element spans the
-// full viewport width, and while it is pointer‑opaque it (a) swallows
-// clicks on the UI behind that strip and (b) pauses the auto‑hide timer
-// as soon as the pointer is anywhere over the strip – which sticks the
-// snackbar open whenever it opens under a stationary cursor. Keep the
-// root pointer‑transparent and only the alert box itself interactive.
-const SNACKBAR_SX = {
-  pointerEvents: 'none',
-  '& .MuiAlert-root': { pointerEvents: 'auto' },
-};
-
-// The snackbar message for a stack entry (a single delete names the
-// task, bulk removals use a count).
-const undoDescription = (items) =>
-  items.length === 1
-    ? `Deleted "${items[0].task.title}"`
-    : `Deleted ${items.length} tasks`;
 
 // A simple To Do application allowing users to add tasks with a title and
 // description. Task state, mutations and persistence live in the `useTasks`
@@ -551,86 +532,28 @@ function App() {
           restarts the auto‑hide timer for every entry: auto‑hide only
           drops the newest one, so each pending undo gets its own
           6‑second window instead of the whole stack expiring at once. */}
-        <Snackbar
-          key={
-            undoStack.length > 0
-              ? undoStack[undoStack.length - 1].stamp
-              : 'no-undo'
-          }
-          open={undoStack.length > 0}
-          autoHideDuration={6000}
+        <UndoSnackbar
+          stack={undoStack}
+          onUndo={handleUndo}
           onClose={closeUndoSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          sx={{ mb: 2, ...SNACKBAR_SX }}
-        >
-          <Alert
-            severity="info"
-            variant="filled"
-            onClose={closeUndoSnackbar}
-            action={
-              <Button color="inherit" size="small" onClick={handleUndo}>
-                Undo
-              </Button>
-            }
-          >
-            {undoStack.length > 0
-              ? undoDescription(undoStack[undoStack.length - 1].items)
-              : ''}
-          </Alert>
-        </Snackbar>
+        />
 
         {/* Confirmation before an import may replace the current list: the
           user picks between replacing it and merging the imported tasks
           into it. */}
-        <Dialog
-          open={Boolean(pendingImport)}
-          onClose={closeImportDialog}
-          aria-labelledby="import-dialog-title"
-        >
-          <DialogTitle id="import-dialog-title">Import tasks?</DialogTitle>
-          <DialogContent>
-            <Typography component="p" color="text.secondary">
-              This file contains{' '}
-              {pendingImport &&
-                (pendingImport.length === 1
-                  ? '1 task'
-                  : `${pendingImport.length} tasks`)}
-              .
-            </Typography>
-            <Typography component="p" color="text.secondary">
-              Replacing removes your current tasks (export them first if you
-              need a copy); merging keeps your tasks and adds the imported ones,
-              skipping tasks whose id already exists.
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={closeImportDialog}>Cancel</Button>
-            <Button onClick={handleImportMerge} variant="outlined">
-              Merge into list
-            </Button>
-            <Button
-              onClick={handleImportReplace}
-              variant="contained"
-              color="warning"
-            >
-              Replace list
-            </Button>
-          </DialogActions>
-        </Dialog>
+        {pendingImport && (
+          <ImportDialog
+            taskCount={pendingImport.length}
+            onCancel={closeImportDialog}
+            onMerge={handleImportMerge}
+            onReplace={handleImportReplace}
+          />
+        )}
 
         {/* Warning shown while a persistence attempt has failed (storage full
           or unavailable): the list still works, but changes may not survive
           a reload. It stays visible until the next successful write. */}
-        <Snackbar
-          open={persistFailed}
-          autoHideDuration={null}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-          sx={{ mt: 8, ...SNACKBAR_SX }}
-        >
-          <Alert severity="warning">
-            Tasks could not be saved to this browser – changes may be lost.
-          </Alert>
-        </Snackbar>
+        <PersistWarning open={persistFailed} />
       </Box>
     </ThemeProvider>
   );

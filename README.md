@@ -86,10 +86,10 @@ the build the `ci` job publishes.
 
 ```
 src/
-  App.jsx              App shell: task list layout, due‑date sort, reminders,
-                       export/import, undo + import dialogs and warning
-                       snackbars; the new‑task form, filter bar and theme
-                       toggle live in components/
+  App.jsx              App shell: task list layout, due‑date sort,
+                       reminders, export/import, undo state and the
+                       import‑error snackbar; the import dialog, undo
+                       snackbar and persist warning live in components/
   main.jsx             Entry point (mounts App behind the ErrorBoundary)
   theme.js             createAppTheme(mode): light + dark Material themes
   hooks/
@@ -118,6 +118,11 @@ src/
                        counter, "clear completed"
     SearchBar.jsx      Compact search box (the query is transient, owned by
                        the app; matching lives in utils/taskList.js)
+    ImportDialog.jsx   Confirmation before an import may replace the list
+                       (replace vs. merge)
+    UndoSnackbar.jsx   Multi‑level undo prompt after deletions
+    PersistWarning.jsx Persistent warning while storage writes fail
+    snackbarSx.js      Shared pointer‑transparent style for the snackbars
     ThemeToggle.jsx    Light / system / dark selector for the app bar
     Placeholder.jsx    Empty state
     ErrorBoundary.jsx  Last‑resort crash UI with a reload button

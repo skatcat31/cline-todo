@@ -421,6 +421,24 @@ describe('useTasks', () => {
     expect(result.current.tasks).toHaveLength(1);
     expect(result.current.tasks[0].title).toBe('Task B');
   });
+
+  test('reorderTask moves a task relative to another one', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      result.current.addTask('Task A', '');
+      result.current.addTask('Task B', '');
+      result.current.addTask('Task C', '');
+    });
+    const ids = result.current.tasks.map((t) => t.id);
+    act(() => {
+      result.current.reorderTask(ids[0], ids[2], true);
+    });
+    expect(result.current.tasks.map((t) => t.title)).toEqual([
+      'Task B',
+      'Task C',
+      'Task A',
+    ]);
+  });
 });
 
 describe('tasksReducer', () => {
@@ -497,6 +515,67 @@ describe('tasksReducer', () => {
     ).toBe(tasks);
     expect(
       tasksReducer(tasks, { type: 'move-task', id: 'a', swapId: 'a' }),
+    ).toBe(tasks);
+  });
+
+  test('reorder-task moves a task before/after the target without mutating', () => {
+    const tasks = [
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+      { id: 'c', title: 'C', done: false, subtasks: [] },
+      { id: 'd', title: 'D', done: false, subtasks: [] },
+    ];
+    // Moving a task down: drop 'a' into the lower half of 'c'.
+    expect(
+      tasksReducer(tasks, {
+        type: 'reorder-task',
+        id: 'a',
+        targetId: 'c',
+        after: true,
+      }).map((t) => t.id),
+    ).toEqual(['b', 'c', 'a', 'd']);
+    // Moving a task up: drop 'd' into the upper half of 'b' – it lands
+    // directly before b.
+    expect(
+      tasksReducer(tasks, {
+        type: 'reorder-task',
+        id: 'd',
+        targetId: 'b',
+        after: false,
+      }).map((t) => t.id),
+    ).toEqual(['a', 'd', 'b', 'c']);
+    // The previous state array must not have been mutated.
+    expect(tasks.map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  test('reorder-task leaves the list untouched for unknown or identical ids', () => {
+    const tasks = [
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+    ];
+    expect(
+      tasksReducer(tasks, {
+        type: 'reorder-task',
+        id: 'a',
+        targetId: 'a',
+        after: true,
+      }),
+    ).toBe(tasks);
+    expect(
+      tasksReducer(tasks, {
+        type: 'reorder-task',
+        id: 'nope',
+        targetId: 'b',
+        after: false,
+      }),
+    ).toBe(tasks);
+    expect(
+      tasksReducer(tasks, {
+        type: 'reorder-task',
+        id: 'a',
+        targetId: 'nope',
+        after: false,
+      }),
     ).toBe(tasks);
   });
 });

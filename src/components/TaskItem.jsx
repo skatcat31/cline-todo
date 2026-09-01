@@ -12,6 +12,7 @@ import EditOutlined from '@mui/icons-material/EditOutlined';
 import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
 import ArrowUpward from '@mui/icons-material/ArrowUpward';
 import ArrowDownward from '@mui/icons-material/ArrowDownward';
+import DragIndicator from '@mui/icons-material/DragIndicator';
 import SubtaskItem from './SubtaskItem.jsx';
 import SubtaskForm from './SubtaskForm.jsx';
 import { dueBadge } from '../utils/dates.js';
@@ -35,6 +36,17 @@ import { dueBadge } from '../utils/dates.js';
  *   onMoveDown - move this task one row down in the visible list
  *   canMoveUp - whether a row exists above this one (disables the up button)
  *   canMoveDown - whether a row exists below this one (disables the down button)
+ *   dragTask - the in‑progress drag‑and‑drop reorder: { id, overId, after }
+ *              (the dragged task, the row currently hovered and which half
+ *              of it) or null when nothing is being dragged; this task's
+ *              row paints a drop indicator while it is the hover target
+ *   onDragStartTask - called with this task's id when a drag starts on its
+ *                     drag handle
+ *   onDragOverTask - called with (this task's id, dropped‑in‑lower‑half)
+ *                    while the pointer is over this row
+ *   onDropTask - called with (this task's id, dropped‑in‑lower‑half) when
+ *                a drag is dropped on this row
+ *   onDragEndTask - called when the drag ends (drop or cancel)
  *   focusToken - a changing, non-null token that moves focus to this
  *                task's checkbox (the parent sets it for the task that
  *                now occupies a just-deleted task's position; a token
@@ -53,6 +65,11 @@ export default function TaskItem({
   onMoveDown,
   canMoveUp = false,
   canMoveDown = false,
+  dragTask = null,
+  onDragStartTask,
+  onDragOverTask,
+  onDropTask,
+  onDragEndTask,
   focusToken = null,
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -100,12 +117,49 @@ export default function TaskItem({
     setSubtaskFormOpen(false);
   };
 
+  // Whether a drop on this row lands in its lower half (the task is
+  // inserted after it) or its upper half (before it).
+  const dropAfter = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY >= rect.top + rect.height / 2;
+  };
+
+  // Whether this row is the current hover target of an in‑progress drag
+  // (never while the dragged task is this one).
+  const isDropTarget =
+    Boolean(dragTask) && dragTask.overId === task.id && dragTask.id !== task.id;
+
+  // The drop indicator: a thin primary‑colored line marking where the
+  // dragged task would land.
+  const dropIndicator = (
+    <Box
+      aria-hidden="true"
+      sx={{
+        height: 2,
+        mx: 0.5,
+        borderRadius: 1,
+        backgroundColor: 'primary.main',
+      }}
+    />
+  );
+
   return (
     <Box
       component="li"
       aria-labelledby={`task-title-${task.id}`}
       sx={{ px: 2, py: 2 }}
+      onDragOver={(event) => {
+        // Allow dropping on this row and report where the pointer is so
+        // the app can move the drop indicator.
+        event.preventDefault();
+        onDragOverTask(task.id, dropAfter(event));
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        onDropTask(task.id, dropAfter(event));
+      }}
     >
+      {isDropTarget && !dragTask.after && dropIndicator}
       {/* Row: checkbox + primary/secondary text (Material list item pattern) */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
         <Checkbox
@@ -173,6 +227,26 @@ export default function TaskItem({
       <Box
         sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 5, mt: 0.5 }}
       >
+        {/* Drag handle: starts an HTML5 drag; dropping the task on
+            another row reorders it. The move up/down buttons below stay
+            available for keyboard users. */}
+        <IconButton
+          size="small"
+          aria-label="Reorder task"
+          title="Drag to move the task"
+          draggable
+          onDragStart={(event) => {
+            // Firefox requires data to be set for the drag to start.
+            if (event.dataTransfer) {
+              event.dataTransfer.setData('text/plain', task.id);
+              event.dataTransfer.effectAllowed = 'move';
+            }
+            onDragStartTask(task.id);
+          }}
+          onDragEnd={onDragEndTask}
+        >
+          <DragIndicator fontSize="small" />
+        </IconButton>
         <IconButton
           size="small"
           aria-label="Add subtask"
@@ -281,6 +355,9 @@ export default function TaskItem({
           onCancel={() => setSubtaskFormOpen(false)}
         />
       )}
+      {/* Drop indicator for a drop in this row's lower half (the task
+          lands between this one and the next). */}
+      {isDropTarget && dragTask.after && dropIndicator}
       {/* Material list divider between tasks (negative margin to bleed
           to the card edges) */}
       <Divider sx={{ mx: -2 }} />

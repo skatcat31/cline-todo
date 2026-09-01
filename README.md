@@ -18,7 +18,8 @@ browser's `localStorage`.
   completed" action
 - Search the list by task title, description or subtask title (transient –
   not persisted)
-- Reorder tasks with move up/down buttons (works on the visible list, so
+- Reorder tasks by dragging them onto another row (drag handle, with a drop
+  indicator) or with the move up/down buttons (works on the visible list, so
   it behaves sensibly while a filter is active)
 - Due dates on tasks: set when adding or editing; overdue and due‑today
   tasks are highlighted

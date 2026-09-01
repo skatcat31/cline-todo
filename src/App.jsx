@@ -47,6 +47,17 @@ const FILTER_KEY = 'todo-filter';
 // dropped once the limit is reached.
 const UNDO_LIMIT = 5;
 
+// Shared style for the snackbars: a MUI snackbar's root element spans the
+// full viewport width, and while it is pointer‑opaque it (a) swallows
+// clicks on the UI behind that strip and (b) pauses the auto‑hide timer
+// as soon as the pointer is anywhere over the strip – which sticks the
+// snackbar open whenever it opens under a stationary cursor. Keep the
+// root pointer‑transparent and only the alert box itself interactive.
+const SNACKBAR_SX = {
+  pointerEvents: 'none',
+  '& .MuiAlert-root': { pointerEvents: 'auto' },
+};
+
 // The snackbar message for a stack entry (a single delete names the
 // task, bulk removals use a count).
 const undoDescription = (items) =>
@@ -65,6 +76,7 @@ function App() {
     toggleTask,
     deleteTask,
     moveTask,
+    reorderTask,
     insertTasks,
     editTask,
     addSubtask,
@@ -179,6 +191,39 @@ function App() {
       moveTask(id, shownTasks[position + 1].id);
     }
   };
+
+  // The in‑progress drag‑and‑drop reorder (HTML5 drag events on the drag
+  // handle): the dragged task's id plus the row currently hovered and
+  // which half of it (so the list can paint a drop indicator). `null`
+  // means no drag in progress.
+  const [dragTask, setDragTask] = useState(null);
+
+  // A drag started on a task's handle.
+  const handleDragStartTask = (id) =>
+    setDragTask({ id, overId: null, after: false });
+
+  // The pointer is over another row: update the drop indicator, but skip
+  // the re‑render when nothing (hovered row / half) actually changed.
+  const handleDragOverTask = (overId, after) => {
+    setDragTask((prev) => {
+      if (!prev || prev.id === overId) return prev;
+      if (prev.overId === overId && prev.after === after) return prev;
+      return { ...prev, overId, after };
+    });
+  };
+
+  // A drop on a row: move the dragged task before/after that row, then
+  // end the drag.
+  const handleDropTask = (overId, after) => {
+    if (dragTask && dragTask.id !== overId) {
+      reorderTask(dragTask.id, overId, after);
+    }
+    setDragTask(null);
+  };
+
+  // The drag ended (dropped on a row, or outside the list): clear the
+  // indicator either way.
+  const handleDragEndTask = () => setDragTask(null);
 
   // Handle the undo snackbar closing. The close reasons have different
   // intents:
@@ -378,6 +423,11 @@ function App() {
                     canMoveDown={position < shownTasks.length - 1}
                     onMoveUp={() => handleMoveTask(task.id, 'up')}
                     onMoveDown={() => handleMoveTask(task.id, 'down')}
+                    dragTask={dragTask}
+                    onDragStartTask={handleDragStartTask}
+                    onDragOverTask={handleDragOverTask}
+                    onDropTask={handleDropTask}
+                    onDragEndTask={handleDragEndTask}
                     focusToken={
                       focusTask && focusTask.id === task.id
                         ? focusTask.stamp
@@ -396,7 +446,7 @@ function App() {
           autoHideDuration={6000}
           onClose={() => setImportError(false)}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, ...SNACKBAR_SX }}
         >
           <Alert severity="error">
             Import failed – the file is not a valid task list.
@@ -420,7 +470,7 @@ function App() {
           autoHideDuration={6000}
           onClose={closeUndoSnackbar}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, ...SNACKBAR_SX }}
         >
           <Alert
             severity="info"
@@ -484,7 +534,7 @@ function App() {
           open={persistFailed}
           autoHideDuration={null}
           anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-          sx={{ mt: 8 }}
+          sx={{ mt: 8, ...SNACKBAR_SX }}
         >
           <Alert severity="warning">
             Tasks could not be saved to this browser – changes may be lost.

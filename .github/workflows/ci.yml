@@ -12,7 +12,9 @@ concurrency:
 
 jobs:
   # Lint, format check, unit tests (with coverage gate) and the production
-  # build. The built app is published as an artifact for the deploy job.
+  # build. The built app (root base path) is published as an artifact that
+  # the e2e job serves and tests; the deploy job rebuilds with the GitHub
+  # Pages base path.
   ci:
     runs-on: ubuntu-latest
     steps:
@@ -37,8 +39,12 @@ jobs:
       - name: Run tests with coverage
         run: npm test -- --coverage
 
+      # Build for the root base path: the e2e job serves this artifact with
+      # `vite preview --base=/`, so the two must agree. On the runner
+      # GITHUB_REPOSITORY is set and would otherwise drive the GitHub
+      # Pages sub‑path base in vite.config.js.
       - name: Build for production
-        run: npm run build
+        run: npm run build -- --base=/
 
       - name: Upload built app
         uses: actions/upload-artifact@v7
@@ -46,10 +52,12 @@ jobs:
           name: dist
           path: dist
 
-  # End-to-end tests (Playwright) against a production build, covering the
-  # core user flows and the PWA service worker / offline behavior.
+  # End-to-end tests (Playwright) against the production build the ci job
+  # published – covering the core user flows and the PWA service worker /
+  # offline behavior without building the app a second time.
   e2e:
     runs-on: ubuntu-latest
+    needs: [ci]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -62,6 +70,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Download built app
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
 
       # Reuse the Chromium binary between runs (the system dependencies are
       # still installed by --with-deps; only the browser download is cached).
@@ -78,8 +92,11 @@ jobs:
         run: npx playwright test
 
   # Publish the built app to GitHub Pages (main branch only). The gh-pages
-  # branch is the Pages source for this repository. Deployment is gated on
-  # the e2e job as well, so a broken user flow never reaches the live site.
+  # branch is the Pages source for this repository. The deploy job rebuilds
+  # from source (rather than reusing the ci job's artifact) because GitHub
+  # Pages needs the repository sub‑path base, while the ci job builds with
+  # the root base for the e2e job. Deployment is gated on the e2e job as
+  # well, so a broken user flow never reaches the live site.
   deploy:
     runs-on: ubuntu-latest
     needs: [ci, e2e]
@@ -88,11 +105,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Download built app
-        uses: actions/download-artifact@v8
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
         with:
-          name: dist
-          path: dist
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # GITHUB_REPOSITORY is set on the runner, so this builds with the
+      # GitHub Pages sub‑path base (see vite.config.js).
+      - name: Build for production
+        run: npm run build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4.1.0

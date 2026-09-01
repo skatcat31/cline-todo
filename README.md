@@ -63,23 +63,24 @@ npm run dev # start the dev server
 
 ## Scripts
 
-| Script                 | Description                                                        |
-| ---------------------- | ------------------------------------------------------------------ |
-| `npm run dev`          | Start the Vite dev server                                          |
-| `npm test`             | Run the test suite once                                            |
-| `npm run test:watch`   | Run tests in watch mode                                            |
-| `npm run test:e2e`     | Playwright end‑to‑end tests (production build + service worker)    |
-| `npm run lint`         | ESLint over the whole project                                      |
-| `npm run format`       | Prettier (write)                                                   |
-| `npm run format:check` | Prettier (check)                                                   |
-| `npm run build`        | Production build into `dist/`                                      |
-| `npm run preview`      | Preview the production build locally                               |
-| `npm run icons`        | Regenerate the PWA icons from the favicon design (`public/icons/`) |
+| Script                 | Description                                                          |
+| ---------------------- | -------------------------------------------------------------------- |
+| `npm run dev`          | Start the Vite dev server                                            |
+| `npm test`             | Run the test suite once                                              |
+| `npm run test:watch`   | Run tests in watch mode                                              |
+| `npm run test:e2e`     | Playwright end‑to‑end tests (serves `dist/`, builds it when missing) |
+| `npm run lint`         | ESLint over the whole project                                        |
+| `npm run format`       | Prettier (write)                                                     |
+| `npm run format:check` | Prettier (check)                                                     |
+| `npm run build`        | Production build into `dist/`                                        |
+| `npm run preview`      | Preview the production build locally                                 |
+| `npm run icons`        | Regenerate the PWA icons from the favicon design (`public/icons/`)   |
 
 Coverage is enforced at 80% (statements, branches, functions and lines) in
 `vite.config.js`; run it with `npm test -- --coverage`. End‑to‑end tests
 (`e2e/`) run the core user flows plus the PWA service worker / offline
-behavior against a production build (`npm run test:e2e`).
+behavior against a production build (`npm run test:e2e`); on CI that is
+the build the `ci` job publishes.
 
 ## Project structure
 
@@ -127,6 +128,9 @@ src/
     taskList.js        Pure list‑level operations: filtering, counters,
                        due‑date sorting, the "clear completed" undo payload
                        and import merging
+    taskNormalize.js   Coerces stored/imported tasks and lists to the
+                       canonical shape (shared by useTasks.js and
+                       taskFile.js)
     dates.js           Due‑date helpers: local "YYYY‑MM‑DD" dates, overdue
                        detection and display formatting
     filters.js         The FILTERS list (value + label) shared by FilterBar
@@ -142,10 +146,11 @@ src/
 
 - **GitHub Pages** – pushing to `main` runs the CI workflow
   (`.github/workflows/ci.yml`): a `ci` job (lint, format check, test with
-  coverage, build), an `e2e` job (Playwright) and a `deploy` job that
-  publishes `dist/` to GitHub Pages. The Vite `base` is derived from
-  `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path. GitHub
-  Pages cannot set response headers, so the build injects a
+  coverage, build), an `e2e` job (Playwright, run against the build the
+  `ci` job publishes) and a `deploy` job that rebuilds with the Pages
+  base path and publishes it to GitHub Pages. The Vite `base` is derived
+  from `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path.
+  GitHub Pages cannot set response headers, so the build injects a
   `Content-Security-Policy` meta tag into `index.html` instead.
 - **Docker** – a multi‑stage build compiles the site with Node and serves
   it with nginx (running as the unprivileged `nginx` user on port 8080);

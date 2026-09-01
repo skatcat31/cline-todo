@@ -39,6 +39,15 @@ jobs:
       - name: Run tests with coverage
         run: npm test -- --coverage
 
+      # Publish the HTML coverage report (written to coverage/ by the test
+      # step, see coverage.reporter in vite.config.js) so per-file coverage
+      # can be browsed without digging through the log.
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage
+
       # Build for the root base path: the e2e job serves this artifact with
       # `vite preview --base=/`, so the two must agree. On the runner
       # GITHUB_REPOSITORY is set and would otherwise drive the GitHub

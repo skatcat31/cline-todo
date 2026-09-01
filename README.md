@@ -78,7 +78,8 @@ npm run dev # start the dev server
 | `npm run icons`        | Regenerate the PWA icons from the favicon design (`public/icons/`)   |
 
 Coverage is enforced at 80% (statements, branches, functions and lines) in
-`vite.config.js`; run it with `npm test -- --coverage`. End‑to‑end tests
+`vite.config.js`; run it with `npm test -- --coverage`; on CI the HTML
+report is published as a `coverage` artifact. End‑to‑end tests
 (`e2e/`) run the core user flows plus the PWA service worker / offline
 behavior against a production build (`npm run test:e2e`); on CI that is
 the build the `ci` job publishes. The production build is additionally

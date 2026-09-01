@@ -232,23 +232,37 @@ export function tasksReducer(state, action) {
       // The items go into the list they were removed from (action.listId);
       // if that list no longer exists, the active list is the fallback.
       // Indices are applied in ascending order and clamped so stale
-      // positions never drop or corrupt the list.
+      // positions never drop or corrupt the list. Items whose remembered
+      // task is not task‑shaped (a stale entry whose state was lost), or
+      // whose id already exists in the target list (e.g. another tab
+      // re‑added it since the entry was created), are skipped.
       const targetId =
         action.listId && lists.some((list) => list.id === action.listId)
           ? action.listId
           : activeListId;
+      const target = lists.find((list) => list.id === targetId);
+      if (!target) return state;
+      const existingIds = new Set(target.tasks.map((task) => task.id));
+      const items = [...action.items]
+        .filter(
+          ({ task }) =>
+            task &&
+            typeof task === 'object' &&
+            typeof task.id === 'string' &&
+            !existingIds.has(task.id),
+        )
+        .sort((a, b) => a.index - b.index);
+      if (items.length === 0) return state;
+      const next = [...target.tasks];
+      for (const { task, index } of items) {
+        const clamped = Math.max(0, Math.min(index, next.length));
+        next.splice(clamped, 0, task);
+      }
       return {
         ...state,
-        lists: lists.map((list) => {
-          if (list.id !== targetId) return list;
-          const next = [...list.tasks];
-          const items = [...action.items].sort((a, b) => a.index - b.index);
-          for (const { task, index } of items) {
-            const clamped = Math.max(0, Math.min(index, next.length));
-            next.splice(clamped, 0, task);
-          }
-          return { ...list, tasks: next };
-        }),
+        lists: lists.map((list) =>
+          list.id === targetId ? { ...list, tasks: next } : list,
+        ),
       };
     }
     case 'edit-task':

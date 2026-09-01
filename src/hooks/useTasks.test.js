@@ -544,6 +544,48 @@ describe('tasksReducer', () => {
     ).toEqual(['x', 'a', 'b']);
   });
 
+  test('insert-tasks skips malformed items and ids that already exist', () => {
+    const existing = stateWith([
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+    ]);
+    const after = tasksReducer(existing, {
+      type: 'insert-tasks',
+      listId: 'l1',
+      items: [
+        // Malformed: the remembered task object is gone (stale undo entry).
+        { task: undefined, index: 0 },
+        // Not an object at all.
+        { task: 'garbage', index: 0 },
+        // Already present in the target list (another tab re‑added it).
+        {
+          task: { id: 'a', title: 'Duplicate', done: false, subtasks: [] },
+          index: 0,
+        },
+        // The only usable item.
+        { task: { id: 'x', title: 'X', done: false, subtasks: [] }, index: 0 },
+      ],
+    });
+    expect(taskIds(after)).toEqual(['x', 'a']);
+  });
+
+  test('insert-tasks leaves the state untouched when nothing is usable', () => {
+    const existing = stateWith([
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+    ]);
+    const after = tasksReducer(existing, {
+      type: 'insert-tasks',
+      listId: 'l1',
+      items: [
+        { task: undefined, index: 0 },
+        {
+          task: { id: 'a', title: 'Duplicate', done: false, subtasks: [] },
+          index: 0,
+        },
+      ],
+    });
+    expect(after).toBe(existing);
+  });
+
   test('insert-tasks targets the given list and leaves the others alone', () => {
     const state = {
       lists: [

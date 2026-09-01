@@ -3,6 +3,7 @@ import {
   completedItems,
   indexOfTask,
   mergeTasks,
+  sortTasksByDue,
   tasksMatching,
   taskCounts,
   visibleTasks,
@@ -153,5 +154,48 @@ describe('tasksMatching', () => {
 
   test('returns an empty list when nothing matches', () => {
     expect(tasksMatching(searchable, 'zzz')).toEqual([]);
+  });
+});
+
+describe('sortTasksByDue', () => {
+  const due = [
+    { id: 'a', title: 'A', due: '2026-03-15', done: false, subtasks: [] },
+    { id: 'b', title: 'B', due: '2026-01-05', done: false, subtasks: [] },
+    { id: 'c', title: 'C', due: null, done: false, subtasks: [] },
+    { id: 'd', title: 'D', due: '2026-02-20', done: false, subtasks: [] },
+  ];
+
+  test('orders tasks with a due date earliest‑first', () => {
+    expect(sortTasksByDue(due).map((t) => t.id)).toEqual(['b', 'd', 'a', 'c']);
+  });
+
+  test('moves tasks without a due date to the end, keeping their order', () => {
+    const list = [
+      { id: 'x', title: 'X', due: null, done: false, subtasks: [] },
+      { id: 'y', title: 'Y', due: '2026-01-01', done: false, subtasks: [] },
+      { id: 'z', title: 'Z', due: null, done: false, subtasks: [] },
+    ];
+    expect(sortTasksByDue(list).map((t) => t.id)).toEqual(['y', 'x', 'z']);
+  });
+
+  test('keeps a stable order for equal or missing due dates', () => {
+    const list = [
+      { id: 'p', title: 'P', due: '2026-05-05', done: false, subtasks: [] },
+      { id: 'q', title: 'Q', due: null, done: false, subtasks: [] },
+      { id: 'r', title: 'R', due: '2026-05-05', done: false, subtasks: [] },
+    ];
+    // Equal due dates keep their original relative order; the undated
+    // task ends up last.
+    expect(sortTasksByDue(list).map((t) => t.id)).toEqual(['p', 'r', 'q']);
+  });
+
+  test('does not modify the input array', () => {
+    const before = due.map((t) => t.id);
+    sortTasksByDue(due);
+    expect(due.map((t) => t.id)).toEqual(before);
+  });
+
+  test('returns an empty list for an empty input', () => {
+    expect(sortTasksByDue([])).toEqual([]);
   });
 });

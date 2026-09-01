@@ -4,7 +4,7 @@ import {
   STORAGE_KEY,
   STORAGE_VERSION,
   normalizeTasks,
-  parseStoredTasks,
+  parseStoredPayload,
   tasksReducer,
   useTasks,
 } from './useTasks.js';
@@ -68,8 +68,14 @@ describe('useTasks', () => {
     });
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
     expect(stored.version).toBe(STORAGE_VERSION);
-    expect(stored.tasks).toHaveLength(1);
-    expect(stored.tasks[0]).toMatchObject({ title: 'Task A', done: false });
+    expect(stored.activeListId).toBe('default');
+    expect(stored.lists).toHaveLength(1);
+    expect(stored.lists[0].name).toBe('To-Do');
+    expect(stored.lists[0].tasks).toHaveLength(1);
+    expect(stored.lists[0].tasks[0]).toMatchObject({
+      title: 'Task A',
+      done: false,
+    });
   });
 
   test('falls back to an empty list when the stored value is corrupt', () => {
@@ -421,83 +427,351 @@ describe('useTasks', () => {
     expect(result.current.tasks).toHaveLength(1);
     expect(result.current.tasks[0].title).toBe('Task B');
   });
+
+  test('reorderTask moves a task relative to another one', () => {
+    const { result } = renderHook(() => useTasks());
+    act(() => {
+      result.current.addTask('Task A', '');
+      result.current.addTask('Task B', '');
+      result.current.addTask('Task C', '');
+    });
+    const ids = result.current.tasks.map((t) => t.id);
+    act(() => {
+      result.current.reorderTask(ids[0], ids[2], true);
+    });
+    expect(result.current.tasks.map((t) => t.title)).toEqual([
+      'Task B',
+      'Task C',
+      'Task A',
+    ]);
+  });
+});
+
+test('addList, renameList, selectList and deleteList manage the lists', () => {
+  const { result } = renderHook(() => useTasks());
+  act(() => {
+    result.current.addTask('In first list', '');
+  });
+  act(() => {
+    result.current.addList('Second');
+  });
+  expect(result.current.lists).toHaveLength(2);
+  // The new list becomes active and starts out empty.
+  expect(result.current.activeListId).toBe(result.current.lists[1].id);
+  expect(result.current.lists[1].name).toBe('Second');
+  expect(result.current.tasks).toEqual([]);
+
+  act(() => {
+    result.current.addTask('In second list', '');
+  });
+  act(() => {
+    result.current.selectList(result.current.lists[0].id);
+  });
+  // Each list keeps its own tasks.
+  expect(result.current.tasks.map((t) => t.title)).toEqual(['In first list']);
+
+  act(() => {
+    result.current.renameList(result.current.lists[1].id, 'Renamed');
+  });
+  expect(result.current.lists[1].name).toBe('Renamed');
+
+  act(() => {
+    result.current.deleteList(result.current.lists[1].id);
+  });
+  expect(result.current.lists).toHaveLength(1);
+  expect(result.current.lists[0].name).toBe('To-Do');
+  // The remaining (first) list stays active.
+  expect(result.current.tasks.map((t) => t.title)).toEqual(['In first list']);
 });
 
 describe('tasksReducer', () => {
+  // Build a reducer state whose single list holds the given tasks.
+  const stateWith = (tasks, listId = 'l1') => ({
+    lists: [{ id: listId, name: 'To-Do', tasks }],
+    activeListId: listId,
+  });
+  const taskIds = (state) => state.lists[0].tasks.map((t) => t.id);
+
   test('ignores unknown actions and returns the state untouched', () => {
-    const tasks = [{ id: 'a', title: 'A', done: false, subtasks: [] }];
-    expect(tasksReducer(tasks, { type: 'unknown' })).toBe(tasks);
+    const state = stateWith([
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+    ]);
+    expect(tasksReducer(state, { type: 'unknown' })).toBe(state);
   });
 
   test('insert-tasks places the tasks at the given indices without mutating', () => {
-    const existing = [
+    const existing = stateWith([
       { id: 'a', title: 'A', done: false, subtasks: [] },
       { id: 'b', title: 'B', done: false, subtasks: [] },
-    ];
+    ]);
     const x = { id: 'x', title: 'X', done: false, subtasks: [] };
     const y = { id: 'y', title: 'Y', done: false, subtasks: [] };
     const after = tasksReducer(existing, {
       type: 'insert-tasks',
+      listId: 'l1',
       items: [
         { task: x, index: 0 },
         { task: y, index: 3 },
       ],
     });
-    expect(after.map((t) => t.id)).toEqual(['x', 'a', 'b', 'y']);
-    // The previous state array must not have been mutated.
-    expect(existing.map((t) => t.id)).toEqual(['a', 'b']);
+    expect(taskIds(after)).toEqual(['x', 'a', 'b', 'y']);
+    // The previous state must not have been mutated.
+    expect(existing.lists[0].tasks.map((t) => t.id)).toEqual(['a', 'b']);
   });
 
-  test('insert-tasks clamps out‑of‑range indices instead of corrupting', () => {
-    const existing = [
+  test('insert-tasks clamps out-of-range indices instead of corrupting', () => {
+    const existing = stateWith([
       { id: 'a', title: 'A', done: false, subtasks: [] },
       { id: 'b', title: 'B', done: false, subtasks: [] },
-    ];
+    ]);
     const x = { id: 'x', title: 'X', done: false, subtasks: [] };
     expect(
-      tasksReducer(existing, {
-        type: 'insert-tasks',
-        items: [{ task: x, index: 99 }],
-      }).map((t) => t.id),
+      taskIds(
+        tasksReducer(existing, {
+          type: 'insert-tasks',
+          listId: 'l1',
+          items: [{ task: x, index: 99 }],
+        }),
+      ),
     ).toEqual(['a', 'b', 'x']);
     expect(
-      tasksReducer(existing, {
-        type: 'insert-tasks',
-        items: [{ task: x, index: -3 }],
-      }).map((t) => t.id),
+      taskIds(
+        tasksReducer(existing, {
+          type: 'insert-tasks',
+          listId: 'l1',
+          items: [{ task: x, index: -3 }],
+        }),
+      ),
     ).toEqual(['x', 'a', 'b']);
   });
 
+  test('insert-tasks targets the given list and leaves the others alone', () => {
+    const state = {
+      lists: [
+        {
+          id: 'l1',
+          name: 'First',
+          tasks: [{ id: 'a', title: 'A', done: false, subtasks: [] }],
+        },
+        {
+          id: 'l2',
+          name: 'Second',
+          tasks: [{ id: 'b', title: 'B', done: false, subtasks: [] }],
+        },
+      ],
+      activeListId: 'l1',
+    };
+    const x = { id: 'x', title: 'X', done: false, subtasks: [] };
+    const after = tasksReducer(state, {
+      type: 'insert-tasks',
+      listId: 'l2',
+      items: [{ task: x, index: 0 }],
+    });
+    expect(after.lists[0].tasks.map((t) => t.id)).toEqual(['a']);
+    expect(after.lists[1].tasks.map((t) => t.id)).toEqual(['x', 'b']);
+  });
+
+  test('insert-tasks for a missing list falls back to the active one', () => {
+    const state = stateWith([
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+    ]);
+    const x = { id: 'x', title: 'X', done: false, subtasks: [] };
+    const after = tasksReducer(state, {
+      type: 'insert-tasks',
+      listId: 'gone',
+      items: [{ task: x, index: 0 }],
+    });
+    expect(taskIds(after)).toEqual(['x', 'a']);
+  });
+
   test('move-task swaps the two tasks without mutating the state', () => {
-    const tasks = [
+    const state = stateWith([
       { id: 'a', title: 'A', done: false, subtasks: [] },
       { id: 'b', title: 'B', done: false, subtasks: [] },
       { id: 'c', title: 'C', done: false, subtasks: [] },
-    ];
-    const after = tasksReducer(tasks, {
+    ]);
+    const after = tasksReducer(state, {
       type: 'move-task',
       id: 'a',
       swapId: 'b',
     });
-    expect(after.map((t) => t.id)).toEqual(['b', 'a', 'c']);
-    // The previous state array must not have been mutated.
-    expect(tasks.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+    expect(taskIds(after)).toEqual(['b', 'a', 'c']);
+    // The previous state must not have been mutated.
+    expect(state.lists[0].tasks.map((t) => t.id)).toEqual(['a', 'b', 'c']);
   });
 
-  test('move-task leaves the list untouched for unknown or identical ids', () => {
-    const tasks = [
+  test('move-task leaves the state untouched for unknown or identical ids', () => {
+    const state = stateWith([
       { id: 'a', title: 'A', done: false, subtasks: [] },
       { id: 'b', title: 'B', done: false, subtasks: [] },
-    ];
+    ]);
     expect(
-      tasksReducer(tasks, { type: 'move-task', id: 'nope', swapId: 'b' }),
-    ).toBe(tasks);
+      tasksReducer(state, { type: 'move-task', id: 'nope', swapId: 'b' }),
+    ).toBe(state);
     expect(
-      tasksReducer(tasks, { type: 'move-task', id: 'a', swapId: 'nope' }),
-    ).toBe(tasks);
+      tasksReducer(state, { type: 'move-task', id: 'a', swapId: 'nope' }),
+    ).toBe(state);
     expect(
-      tasksReducer(tasks, { type: 'move-task', id: 'a', swapId: 'a' }),
-    ).toBe(tasks);
+      tasksReducer(state, { type: 'move-task', id: 'a', swapId: 'a' }),
+    ).toBe(state);
+  });
+
+  test('reorder-task moves a task before/after the target without mutating', () => {
+    const state = stateWith([
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+      { id: 'c', title: 'C', done: false, subtasks: [] },
+      { id: 'd', title: 'D', done: false, subtasks: [] },
+    ]);
+    // Moving a task down: drop 'a' into the lower half of 'c'.
+    expect(
+      taskIds(
+        tasksReducer(state, {
+          type: 'reorder-task',
+          id: 'a',
+          targetId: 'c',
+          after: true,
+        }),
+      ),
+    ).toEqual(['b', 'c', 'a', 'd']);
+    // Moving a task up: drop 'd' into the upper half of 'b' - it lands
+    // directly before b.
+    expect(
+      taskIds(
+        tasksReducer(state, {
+          type: 'reorder-task',
+          id: 'd',
+          targetId: 'b',
+          after: false,
+        }),
+      ),
+    ).toEqual(['a', 'd', 'b', 'c']);
+    // The previous state must not have been mutated.
+    expect(state.lists[0].tasks.map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  test('reorder-task leaves the state untouched for unknown or identical ids', () => {
+    const state = stateWith([
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+      { id: 'b', title: 'B', done: false, subtasks: [] },
+    ]);
+    expect(
+      tasksReducer(state, {
+        type: 'reorder-task',
+        id: 'a',
+        targetId: 'a',
+        after: true,
+      }),
+    ).toBe(state);
+    expect(
+      tasksReducer(state, {
+        type: 'reorder-task',
+        id: 'nope',
+        targetId: 'b',
+        after: false,
+      }),
+    ).toBe(state);
+    expect(
+      tasksReducer(state, {
+        type: 'reorder-task',
+        id: 'a',
+        targetId: 'nope',
+        after: false,
+      }),
+    ).toBe(state);
+  });
+
+  // ---- list-level actions ---------------------------------------------
+  test('add-list appends a new empty list and makes it active', () => {
+    const state = stateWith([]);
+    const after = tasksReducer(state, { type: 'add-list', name: 'Work' });
+    expect(after.lists).toHaveLength(2);
+    expect(after.lists[1].name).toBe('Work');
+    expect(after.lists[1].tasks).toEqual([]);
+    expect(after.activeListId).toBe(after.lists[1].id);
+    expect(after.lists[0]).toBe(state.lists[0]);
+  });
+
+  test('rename-list changes only the name of the given list', () => {
+    const state = stateWith([
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+    ]);
+    const after = tasksReducer(state, {
+      type: 'rename-list',
+      id: 'l1',
+      name: 'Work',
+    });
+    expect(after.lists[0].name).toBe('Work');
+    // The task array reference is preserved.
+    expect(after.lists[0].tasks).toBe(state.lists[0].tasks);
+  });
+
+  test('rename-list leaves the state untouched for an unknown id', () => {
+    const state = stateWith([]);
+    expect(
+      tasksReducer(state, { type: 'rename-list', id: 'nope', name: 'X' }),
+    ).toBe(state);
+  });
+
+  test('select-list switches the active list without touching its tasks', () => {
+    const state = {
+      lists: [
+        { id: 'l1', name: 'First', tasks: [] },
+        { id: 'l2', name: 'Second', tasks: [] },
+      ],
+      activeListId: 'l1',
+    };
+    const after = tasksReducer(state, { type: 'select-list', id: 'l2' });
+    expect(after.activeListId).toBe('l2');
+    expect(after.lists).toBe(state.lists);
+  });
+
+  test('select-list leaves the state untouched for an unknown id', () => {
+    const state = stateWith([]);
+    expect(tasksReducer(state, { type: 'select-list', id: 'nope' })).toBe(
+      state,
+    );
+  });
+
+  test('delete-list removes the list and falls back to the first one', () => {
+    const state = {
+      lists: [
+        {
+          id: 'l1',
+          name: 'First',
+          tasks: [{ id: 'a', title: 'A', done: false, subtasks: [] }],
+        },
+        {
+          id: 'l2',
+          name: 'Second',
+          tasks: [{ id: 'b', title: 'B', done: false, subtasks: [] }],
+        },
+      ],
+      activeListId: 'l2',
+    };
+    const after = tasksReducer(state, { type: 'delete-list', id: 'l2' });
+    expect(after.lists).toHaveLength(1);
+    expect(after.lists[0].id).toBe('l1');
+    // The deleted list was the active one, so the active list falls back.
+    expect(after.activeListId).toBe('l1');
+  });
+
+  test('delete-list keeps the active list when another one is removed', () => {
+    const state = {
+      lists: [
+        { id: 'l1', name: 'First', tasks: [] },
+        { id: 'l2', name: 'Second', tasks: [] },
+      ],
+      activeListId: 'l1',
+    };
+    const after = tasksReducer(state, { type: 'delete-list', id: 'l2' });
+    expect(after.lists).toHaveLength(1);
+    expect(after.activeListId).toBe('l1');
+  });
+
+  test('delete-list keeps a single list (there is nothing to fall back to)', () => {
+    const state = stateWith([]);
+    expect(tasksReducer(state, { type: 'delete-list', id: 'l1' })).toBe(state);
   });
 });
 
@@ -561,34 +835,46 @@ describe('normalizeTasks', () => {
   });
 });
 
-describe('parseStoredTasks', () => {
-  test('normalizes a versioned payload', () => {
-    const parsed = parseStoredTasks(
+describe('parseStoredPayload', () => {
+  // The state the parser falls back to whenever the stored value is
+  // missing or unusable.
+  const defaultEmpty = {
+    lists: [{ id: 'default', name: 'To-Do', tasks: [] }],
+    activeListId: 'default',
+  };
+
+  test('reads a current versioned payload and keeps it as is', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
       JSON.stringify({
-        version: 1,
-        tasks: [{ id: 'x', title: 'X', done: 'yes' }],
+        version: STORAGE_VERSION,
+        activeListId: 'l2',
+        lists: [
+          {
+            id: 'l1',
+            name: 'First',
+            tasks: [
+              {
+                id: '1',
+                title: 'A',
+                description: '',
+                due: null,
+                done: false,
+                subtasks: [],
+              },
+            ],
+          },
+          { id: 'l2', name: 'Second', tasks: [] },
+        ],
       }),
     );
-    expect(parsed).toEqual([
+    const payload = parseStoredPayload(localStorage.getItem(STORAGE_KEY));
+    expect(payload.activeListId).toBe('l2');
+    expect(payload.lists).toHaveLength(2);
+    expect(payload.lists[0].tasks).toEqual([
       {
-        id: 'x',
-        title: 'X',
-        description: '',
-        due: null,
-        done: true,
-        subtasks: [],
-      },
-    ]);
-  });
-
-  test('still accepts the legacy bare‑array payload', () => {
-    const parsed = parseStoredTasks(
-      JSON.stringify([{ id: 'x', title: 'X', done: false }]),
-    );
-    expect(parsed).toEqual([
-      {
-        id: 'x',
-        title: 'X',
+        id: '1',
+        title: 'A',
         description: '',
         due: null,
         done: false,
@@ -597,19 +883,88 @@ describe('parseStoredTasks', () => {
     ]);
   });
 
-  test('returns an empty list for invalid JSON', () => {
+  test('falls back to the first list when the active id is stale', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: STORAGE_VERSION,
+        activeListId: 'gone',
+        lists: [{ id: 'l1', name: 'First', tasks: [] }],
+      }),
+    );
+    const payload = parseStoredPayload(localStorage.getItem(STORAGE_KEY));
+    expect(payload.activeListId).toBe('l1');
+  });
+
+  test('upgrades the legacy bare-array payload into a single list', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([
+        { id: '1', title: 'A', done: false, description: '', subtasks: [] },
+      ]),
+    );
+    const payload = parseStoredPayload(localStorage.getItem(STORAGE_KEY));
+    expect(payload.activeListId).toBe('default');
+    expect(payload.lists).toEqual([
+      {
+        id: 'default',
+        name: 'To-Do',
+        tasks: [
+          {
+            id: '1',
+            title: 'A',
+            description: '',
+            due: null,
+            done: false,
+            subtasks: [],
+          },
+        ],
+      },
+    ]);
+  });
+
+  test('upgrades the legacy versioned { tasks } payload into a single list', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: STORAGE_VERSION,
+        tasks: [
+          { id: '1', title: 'A', done: false, description: '', subtasks: [] },
+        ],
+      }),
+    );
+    const payload = parseStoredPayload(localStorage.getItem(STORAGE_KEY));
+    expect(payload.lists).toHaveLength(1);
+    expect(payload.lists[0].name).toBe('To-Do');
+    expect(payload.lists[0].tasks).toHaveLength(1);
+  });
+
+  test('returns the default state for invalid JSON', () => {
+    localStorage.setItem(STORAGE_KEY, '{not valid json');
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      expect(parseStoredTasks('{not valid json')).toEqual([]);
-      expect(errorSpy).toHaveBeenCalled();
+      expect(parseStoredPayload(localStorage.getItem(STORAGE_KEY))).toEqual(
+        defaultEmpty,
+      );
     } finally {
       errorSpy.mockRestore();
     }
   });
 
-  test('returns an empty list when no task list is stored', () => {
-    expect(parseStoredTasks(JSON.stringify({ version: 1 }))).toEqual([]);
-    expect(parseStoredTasks(JSON.stringify('hello'))).toEqual([]);
-    expect(parseStoredTasks(JSON.stringify(null))).toEqual([]);
+  test('returns the default state when nothing is stored', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    expect(parseStoredPayload(localStorage.getItem(STORAGE_KEY))).toEqual(
+      defaultEmpty,
+    );
+  });
+
+  test('returns the default state for an unrecognized shape', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ version: 1, notLists: true }),
+    );
+    expect(parseStoredPayload(localStorage.getItem(STORAGE_KEY))).toEqual(
+      defaultEmpty,
+    );
   });
 });

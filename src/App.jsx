@@ -17,13 +17,17 @@ import Typography from '@mui/material/Typography';
 import { ThemeProvider } from '@mui/material/styles';
 import FileDownload from '@mui/icons-material/FileDownload';
 import FileUpload from '@mui/icons-material/FileUpload';
+import NotificationsActive from '@mui/icons-material/NotificationsActive';
+import NotificationsNone from '@mui/icons-material/NotificationsNone';
 import FilterBar from './components/FilterBar.jsx';
+import ListTabs from './components/ListTabs.jsx';
 import NewTaskForm from './components/NewTaskForm.jsx';
 import Placeholder from './components/Placeholder.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import TaskItem from './components/TaskItem.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
 import { useColorScheme } from './hooks/useColorScheme.js';
+import { useDueDateReminders } from './hooks/useDueDateReminders.js';
 import { usePersistentState } from './hooks/usePersistentState.js';
 import { useTasks } from './hooks/useTasks.js';
 import { FILTERS } from './utils/filters.js';
@@ -32,6 +36,7 @@ import {
   completedItems,
   indexOfTask,
   mergeTasks,
+  sortTasksByDue,
   tasksMatching,
   taskCounts,
   visibleTasks,
@@ -42,10 +47,26 @@ import {
 // anything else falls back to "all").
 const FILTER_KEY = 'todo-filter';
 
+// localStorage key under which the active sort is remembered (the legal
+// values are "none" – the manual list order – and "due" – earliest due
+// date first; anything else falls back to "none").
+const SORT_KEY = 'todo-sort';
+
 // How many deletion actions the undo snackbar remembers (multi‑level
 // undo): new actions push onto the end of the stack and the oldest one is
 // dropped once the limit is reached.
 const UNDO_LIMIT = 5;
+
+// Shared style for the snackbars: a MUI snackbar's root element spans the
+// full viewport width, and while it is pointer‑opaque it (a) swallows
+// clicks on the UI behind that strip and (b) pauses the auto‑hide timer
+// as soon as the pointer is anywhere over the strip – which sticks the
+// snackbar open whenever it opens under a stationary cursor. Keep the
+// root pointer‑transparent and only the alert box itself interactive.
+const SNACKBAR_SX = {
+  pointerEvents: 'none',
+  '& .MuiAlert-root': { pointerEvents: 'auto' },
+};
 
 // The snackbar message for a stack entry (a single delete names the
 // task, bulk removals use a count).
@@ -60,11 +81,18 @@ const undoDescription = (items) =>
 function App() {
   const {
     tasks,
+    lists,
+    activeListId,
     persistFailed,
+    addList,
+    renameList,
+    deleteList,
+    selectList,
     addTask,
     toggleTask,
     deleteTask,
     moveTask,
+    reorderTask,
     insertTasks,
     editTask,
     addSubtask,
@@ -74,6 +102,12 @@ function App() {
     clearCompleted,
     replaceTasks,
   } = useTasks();
+  // Local due‑date reminders: with the notification permission granted
+  // (and the feature switched on), the hook announces the tasks that are
+  // due today – once per day per task. The app‑bar button asks for the
+  // permission or toggles the on/off choice.
+  const { permission, enabled, requestPermission, toggleEnabled } =
+    useDueDateReminders(tasks);
   // Which list to show: "all", "active" or "completed" – remembered in
   // localStorage (via usePersistentState) so a reload restores the
   // previous view.
@@ -85,6 +119,20 @@ function App() {
       return 'all';
     }
   });
+  // Whether the list is shown in due‑date order instead of the manual
+  // list order – remembered across reloads, like the filter.
+  const [sort, setSort] = usePersistentState(SORT_KEY, () => {
+    try {
+      return localStorage.getItem(SORT_KEY) === 'due' ? 'due' : 'none';
+    } catch {
+      return 'none';
+    }
+  });
+  const sortActive = sort === 'due';
+  // Manual reordering (move up/down, drag and drop) only makes sense in
+  // the manual list order; while the due‑date sort is on it would be
+  // hidden by the derived ordering, so the controls are disabled.
+  const canReorder = !sortActive;
   // The current search query: a transient view filter (title, description
   // or subtask title), unlike the status filter it is not persisted.
   const [search, setSearch] = useState('');
@@ -100,12 +148,14 @@ function App() {
   const undoSeq = useRef(0);
 
   // Push an undoable action onto the stack, dropping the oldest entry
-  // once the limit is reached.
-  const pushUndo = (items) => {
+  // once the limit is reached. `listId` remembers which list the tasks
+  // came from, so undo can restore them there even if the user switched
+  // lists in the meantime.
+  const pushUndo = (items, listId) => {
     undoSeq.current += 1;
     const stamp = undoSeq.current;
     setUndoStack((prev) => {
-      const next = [...prev, { items, stamp }];
+      const next = [...prev, { items, listId, stamp }];
       return next.length > UNDO_LIMIT
         ? next.slice(next.length - UNDO_LIMIT)
         : next;
@@ -147,7 +197,7 @@ function App() {
     const task = tasks[index];
     const remaining = tasks.filter((t) => t.id !== id);
     deleteTask(id);
-    pushUndo([{ task, index }]);
+    pushUndo([{ task, index }], activeListId);
     const target = remaining[Math.min(index, remaining.length - 1)];
     if (target) {
       setFocusTask({ id: target.id, stamp: Date.now() });
@@ -164,7 +214,7 @@ function App() {
   const handleUndo = () => {
     if (undoStack.length === 0) return;
     const latest = undoStack[undoStack.length - 1];
-    insertTasks(latest.items);
+    insertTasks(latest.items, latest.listId);
     setUndoStack(undoStack.slice(0, -1));
   };
 
@@ -180,11 +230,54 @@ function App() {
     }
   };
 
-  // Dismiss the undo snackbar and clear the stack. Auto‑hide and Escape
-  // discard the pending undos; a click anywhere else in the app (reason
-  // "clickaway") must NOT discard them – the user is just working on (or
-  // deleting) more tasks.
+  // The in‑progress drag‑and‑drop reorder (HTML5 drag events on the drag
+  // handle): the dragged task's id plus the row currently hovered and
+  // which half of it (so the list can paint a drop indicator). `null`
+  // means no drag in progress.
+  const [dragTask, setDragTask] = useState(null);
+
+  // A drag started on a task's handle.
+  const handleDragStartTask = (id) =>
+    setDragTask({ id, overId: null, after: false });
+
+  // The pointer is over another row: update the drop indicator, but skip
+  // the re‑render when nothing (hovered row / half) actually changed.
+  const handleDragOverTask = (overId, after) => {
+    setDragTask((prev) => {
+      if (!prev || prev.id === overId) return prev;
+      if (prev.overId === overId && prev.after === after) return prev;
+      return { ...prev, overId, after };
+    });
+  };
+
+  // A drop on a row: move the dragged task before/after that row, then
+  // end the drag.
+  const handleDropTask = (overId, after) => {
+    if (dragTask && dragTask.id !== overId) {
+      reorderTask(dragTask.id, overId, after);
+    }
+    setDragTask(null);
+  };
+
+  // The drag ended (dropped on a row, or outside the list): clear the
+  // indicator either way.
+  const handleDragEndTask = () => setDragTask(null);
+
+  // Handle the undo snackbar closing. The close reasons have different
+  // intents:
+  //  - "timeout" (the auto‑hide expired): drop only the newest entry, so
+  //    the snackbar re‑opens for the previous undo (the changing key
+  //    restarts the auto‑hide timer for it) instead of discarding the
+  //    whole stack after a single 6‑second window;
+  //  - "clickaway" (a click anywhere else in the app): keep the stack –
+  //    the user is just working on (or deleting) more tasks;
+  //  - anything else (the close button, the Escape key): an explicit
+  //    dismiss – clear the whole stack.
   const closeUndoSnackbar = (event, reason) => {
+    if (reason === 'timeout') {
+      setUndoStack((prev) => prev.slice(0, -1));
+      return;
+    }
     if (reason === 'clickaway') return;
     setUndoStack([]);
   };
@@ -194,7 +287,7 @@ function App() {
   const handleClearCompleted = () => {
     const removed = completedItems(tasks);
     clearCompleted();
-    if (removed.length > 0) pushUndo(removed);
+    if (removed.length > 0) pushUndo(removed, activeListId);
   };
 
   // Open the hidden file picker for importing a task list.
@@ -248,7 +341,13 @@ function App() {
 
   // The task list as shown by the search query and the active filter, plus
   // the counters the filter bar shows (pure helpers from utils/taskList.js).
-  const shownTasks = visibleTasks(tasksMatching(tasks, search), filter);
+  // The tasks in the order shown in the list card: search and filter are
+  // applied to the full list; the due‑date sort (when active) reorders
+  // the result. It is a view order only – the stored manual order is
+  // never changed by it.
+  const shownTasks = sortActive
+    ? sortTasksByDue(visibleTasks(tasksMatching(tasks, search), filter))
+    : visibleTasks(tasksMatching(tasks, search), filter);
   const {
     active: activeCount,
     completed: completedCount,
@@ -286,6 +385,31 @@ function App() {
             >
               <FileUpload fontSize="small" />
             </IconButton>
+            {/* Due‑date reminders: without permission the click asks the
+                browser for it (a user gesture is required); with
+                permission it toggles the on/off choice. The filled icon
+                marks the enabled state. */}
+            <IconButton
+              color="inherit"
+              aria-label={
+                permission === 'granted'
+                  ? enabled
+                    ? 'Turn off due‑date reminders'
+                    : 'Turn on due‑date reminders'
+                  : 'Enable due‑date reminders'
+              }
+              title="Remind me about tasks that are due today"
+              disabled={permission === 'denied' || permission === 'unsupported'}
+              onClick={() =>
+                permission === 'granted' ? toggleEnabled() : requestPermission()
+              }
+            >
+              {permission === 'granted' && enabled ? (
+                <NotificationsActive fontSize="small" />
+              ) : (
+                <NotificationsNone fontSize="small" />
+              )}
+            </IconButton>
             {/* Color‑scheme selector (light / system / dark); the choice is
                 persisted by useColorScheme */}
             <ThemeToggle mode={mode} onModeChange={setMode} />
@@ -297,6 +421,21 @@ function App() {
               onChange={handleImportChange}
             />
           </Toolbar>
+          {/* List tabs + list management (create / rename / delete); the
+              row is aligned with the content column below it. */}
+          <Box
+            component="nav"
+            sx={{ maxWidth: 640, mx: 'auto', px: { xs: 2, sm: 3 }, pb: 1 }}
+          >
+            <ListTabs
+              lists={lists}
+              activeListId={activeListId}
+              onSelect={selectList}
+              onAdd={addList}
+              onRename={renameList}
+              onDelete={deleteList}
+            />
+          </Box>
         </AppBar>
 
         {/* Main content surface, centered, using the 8pt spacing grid */}
@@ -323,6 +462,8 @@ function App() {
             <FilterBar
               filter={filter}
               onFilterChange={setFilter}
+              sort={sort}
+              onSortChange={setSort}
               activeCount={activeCount}
               totalCount={totalCount}
               completedCount={completedCount}
@@ -364,10 +505,16 @@ function App() {
                     onToggleSubtask={toggleSubtask}
                     onDeleteSubtask={deleteSubtask}
                     onEditSubtask={editSubtask}
-                    canMoveUp={position > 0}
-                    canMoveDown={position < shownTasks.length - 1}
+                    canMoveUp={position > 0 && canReorder}
+                    canMoveDown={position < shownTasks.length - 1 && canReorder}
                     onMoveUp={() => handleMoveTask(task.id, 'up')}
                     onMoveDown={() => handleMoveTask(task.id, 'down')}
+                    canReorder={canReorder}
+                    dragTask={dragTask}
+                    onDragStartTask={handleDragStartTask}
+                    onDragOverTask={handleDragOverTask}
+                    onDropTask={handleDropTask}
+                    onDragEndTask={handleDragEndTask}
                     focusToken={
                       focusTask && focusTask.id === task.id
                         ? focusTask.stamp
@@ -386,7 +533,7 @@ function App() {
           autoHideDuration={6000}
           onClose={() => setImportError(false)}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, ...SNACKBAR_SX }}
         >
           <Alert severity="error">
             Import failed – the file is not a valid task list.
@@ -397,7 +544,9 @@ function App() {
           completed") pushes an entry onto a stack (most recent last);
           "Undo" re‑inserts the newest entry and the snackbar then offers
           the previous one until the stack is empty. The changing key
-          restarts the auto‑hide timer for every new entry. */}
+          restarts the auto‑hide timer for every entry: auto‑hide only
+          drops the newest one, so each pending undo gets its own
+          6‑second window instead of the whole stack expiring at once. */}
         <Snackbar
           key={
             undoStack.length > 0
@@ -408,7 +557,7 @@ function App() {
           autoHideDuration={6000}
           onClose={closeUndoSnackbar}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, ...SNACKBAR_SX }}
         >
           <Alert
             severity="info"
@@ -472,7 +621,7 @@ function App() {
           open={persistFailed}
           autoHideDuration={null}
           anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-          sx={{ mt: 8 }}
+          sx={{ mt: 8, ...SNACKBAR_SX }}
         >
           <Alert severity="warning">
             Tasks could not be saved to this browser – changes may be lost.

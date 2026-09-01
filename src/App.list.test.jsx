@@ -1,10 +1,10 @@
 // List behaviour: filtering, search, reordering, undo and "clear completed".
 import App from './App';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { act, render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Compatibility layer for jest-dom with Vitest
 import '@testing-library/jest-dom/vitest';
-import { test, expect } from 'vitest';
+import { test, expect, vi } from 'vitest';
 
 /**
  * The filter bar shows only the tasks matching the selected filter, and the
@@ -281,6 +281,64 @@ test('pressing Escape discards all pending undos', async () => {
 });
 
 /**
+ * When the snackbar auto‑hides, only the newest undo is dropped: the
+ * snackbar re‑opens for the previous pending undo (its fresh key restarts
+ * the auto‑hide timer) instead of discarding the whole stack after one
+ * 6‑second window.
+ */
+test('auto-hide offers the previous undo instead of discarding the stack', async () => {
+  // Fake timers (auto‑advancing, so userEvent's internal delays keep
+  // resolving) make the 6‑second auto‑hide jumpable without waiting for it.
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    render(<App />);
+    const titleInput = screen.getByLabelText(/^title/i);
+    const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+    await userEvent.type(titleInput, 'Task A');
+    await userEvent.click(addTaskBtn);
+    await userEvent.type(titleInput, 'Task B');
+    await userEvent.click(addTaskBtn);
+
+    await userEvent.click(
+      within(screen.getByRole('listitem', { name: 'Task A' })).getByRole(
+        'button',
+        { name: 'Delete task' },
+      ),
+    );
+    await userEvent.click(
+      within(screen.getByRole('listitem', { name: 'Task B' })).getByRole(
+        'button',
+        { name: 'Delete task' },
+      ),
+    );
+    expect(await screen.findByText('Deleted "Task B"')).toBeInTheDocument();
+
+    // Jump past the auto‑hide duration: the snackbar now offers the
+    // previous (older) undo instead of disappearing.
+    await act(async () => {
+      vi.advanceTimersByTime(6000);
+    });
+    expect(screen.getByText('Deleted "Task A"')).toBeInTheDocument();
+    expect(screen.queryByText('Task B')).not.toBeInTheDocument();
+
+    // The auto‑hide finalized Task B's deletion: undo now restores the
+    // remaining (older) deletion…
+    await userEvent.click(screen.getByRole('button', { name: /^undo$/i }));
+    expect(screen.getByText('Task A')).toBeInTheDocument();
+    // …while Task B stays gone.
+    expect(screen.queryByText('Task B')).not.toBeInTheDocument();
+    // The stack is empty again: the snackbar closes.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: /^undo$/i }),
+      ).not.toBeInTheDocument(),
+    );
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+/**
  * The search box filters the list by title or description (subtask titles
  * are matched too – covered in utils/taskList.test.js). The query is
  * transient, and a query without matches shows a hint.
@@ -399,4 +457,107 @@ test('moves tasks within the visible list while a filter is active', async () =>
   expect(within(all[0]).getByText('Third')).toBeInTheDocument();
   expect(within(all[1]).getByText('Second')).toBeInTheDocument();
   expect(within(all[2]).getByText('First')).toBeInTheDocument();
+});
+
+/**
+ * Sets up three tasks (A, B, C) and returns a helper that dispatches the
+ * HTML5 drag events of a drag‑and‑drop reorder (jsdom does not implement
+ * the drag machinery itself, but React's handlers are exercised through
+ * the native events).
+ */
+async function setupAndDrag() {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task C');
+  await userEvent.click(addTaskBtn);
+
+  // Dispatch a native event (with a controlled clientY) on a target.
+  const fire = (target, type, clientY) => {
+    const event = new Event(type, { bubbles: true });
+    Object.defineProperty(event, 'clientY', { value: clientY });
+    act(() => {
+      target.dispatchEvent(event);
+    });
+  };
+
+  // Drag from a task's handle onto a target row; the row's geometry is
+  // mocked so the upper/lower half (before/after) is deterministic.
+  const dragTo = (sourceTitle, targetTitle, clientY, top, height) => {
+    const handle = within(
+      screen.getByRole('listitem', { name: sourceTitle }),
+    ).getByRole('button', { name: 'Reorder task' });
+    const row = screen.getByRole('listitem', { name: targetTitle });
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({
+      top,
+      bottom: top + height,
+      left: 0,
+      right: 300,
+      width: 300,
+      height,
+      x: 0,
+      y: top,
+      toJSON: () => '',
+    });
+    fire(handle, 'dragstart');
+    fire(row, 'dragover', clientY);
+    fire(row, 'drop', clientY);
+    fire(handle, 'dragend');
+  };
+
+  return { dragTo };
+}
+
+/**
+ * Drag and drop reorders the list: a drop in the lower half of a row
+ * inserts the task after that row, a drop in the upper half before it.
+ */
+test('reorders a task by dropping it on another row', async () => {
+  const { dragTo } = await setupAndDrag();
+
+  // Drop "Task A" into the lower half of "Task C" (y=260 of 200..300):
+  // it lands after C.
+  dragTo('Task A', 'Task C', 260, 200, 100);
+  let rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task B')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task C')).toBeInTheDocument();
+  expect(within(rows[2]).getByText('Task A')).toBeInTheDocument();
+
+  // Drop "Task A" into the upper half of "Task B" (y=120 of 100..200):
+  // it lands before B.
+  dragTo('Task A', 'Task B', 120, 100, 100);
+  rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task A')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task B')).toBeInTheDocument();
+  expect(within(rows[2]).getByText('Task C')).toBeInTheDocument();
+});
+
+/**
+ * Dropping a task onto itself, or dropping without a drag in progress,
+ * must leave the list untouched.
+ */
+test('ignores a drop that is not a reorder', async () => {
+  const { dragTo } = await setupAndDrag();
+
+  // Drop "Task A" onto its own row: no change.
+  dragTo('Task A', 'Task A', 50, 0, 100);
+  let rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task A')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task B')).toBeInTheDocument();
+
+  // A lone drop event (no dragstart beforehand): no change.
+  const rowB = screen.getByRole('listitem', { name: 'Task B' });
+  const drop = new Event('drop', { bubbles: true });
+  Object.defineProperty(drop, 'clientY', { value: 50 });
+  act(() => {
+    rowB.dispatchEvent(drop);
+  });
+  rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task A')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task B')).toBeInTheDocument();
+  expect(within(rows[2]).getByText('Task C')).toBeInTheDocument();
 });

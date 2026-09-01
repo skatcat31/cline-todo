@@ -458,3 +458,106 @@ test('moves tasks within the visible list while a filter is active', async () =>
   expect(within(all[1]).getByText('Second')).toBeInTheDocument();
   expect(within(all[2]).getByText('First')).toBeInTheDocument();
 });
+
+/**
+ * Sets up three tasks (A, B, C) and returns a helper that dispatches the
+ * HTML5 drag events of a drag‑and‑drop reorder (jsdom does not implement
+ * the drag machinery itself, but React's handlers are exercised through
+ * the native events).
+ */
+async function setupAndDrag() {
+  render(<App />);
+  const titleInput = screen.getByLabelText(/^title/i);
+  const addTaskBtn = screen.getByRole('button', { name: /add task/i });
+  await userEvent.type(titleInput, 'Task A');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task B');
+  await userEvent.click(addTaskBtn);
+  await userEvent.type(titleInput, 'Task C');
+  await userEvent.click(addTaskBtn);
+
+  // Dispatch a native event (with a controlled clientY) on a target.
+  const fire = (target, type, clientY) => {
+    const event = new Event(type, { bubbles: true });
+    Object.defineProperty(event, 'clientY', { value: clientY });
+    act(() => {
+      target.dispatchEvent(event);
+    });
+  };
+
+  // Drag from a task's handle onto a target row; the row's geometry is
+  // mocked so the upper/lower half (before/after) is deterministic.
+  const dragTo = (sourceTitle, targetTitle, clientY, top, height) => {
+    const handle = within(
+      screen.getByRole('listitem', { name: sourceTitle }),
+    ).getByRole('button', { name: 'Reorder task' });
+    const row = screen.getByRole('listitem', { name: targetTitle });
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({
+      top,
+      bottom: top + height,
+      left: 0,
+      right: 300,
+      width: 300,
+      height,
+      x: 0,
+      y: top,
+      toJSON: () => '',
+    });
+    fire(handle, 'dragstart');
+    fire(row, 'dragover', clientY);
+    fire(row, 'drop', clientY);
+    fire(handle, 'dragend');
+  };
+
+  return { dragTo };
+}
+
+/**
+ * Drag and drop reorders the list: a drop in the lower half of a row
+ * inserts the task after that row, a drop in the upper half before it.
+ */
+test('reorders a task by dropping it on another row', async () => {
+  const { dragTo } = await setupAndDrag();
+
+  // Drop "Task A" into the lower half of "Task C" (y=260 of 200..300):
+  // it lands after C.
+  dragTo('Task A', 'Task C', 260, 200, 100);
+  let rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task B')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task C')).toBeInTheDocument();
+  expect(within(rows[2]).getByText('Task A')).toBeInTheDocument();
+
+  // Drop "Task A" into the upper half of "Task B" (y=120 of 100..200):
+  // it lands before B.
+  dragTo('Task A', 'Task B', 120, 100, 100);
+  rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task A')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task B')).toBeInTheDocument();
+  expect(within(rows[2]).getByText('Task C')).toBeInTheDocument();
+});
+
+/**
+ * Dropping a task onto itself, or dropping without a drag in progress,
+ * must leave the list untouched.
+ */
+test('ignores a drop that is not a reorder', async () => {
+  const { dragTo } = await setupAndDrag();
+
+  // Drop "Task A" onto its own row: no change.
+  dragTo('Task A', 'Task A', 50, 0, 100);
+  let rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task A')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task B')).toBeInTheDocument();
+
+  // A lone drop event (no dragstart beforehand): no change.
+  const rowB = screen.getByRole('listitem', { name: 'Task B' });
+  const drop = new Event('drop', { bubbles: true });
+  Object.defineProperty(drop, 'clientY', { value: 50 });
+  act(() => {
+    rowB.dispatchEvent(drop);
+  });
+  rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Task A')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('Task B')).toBeInTheDocument();
+  expect(within(rows[2]).getByText('Task C')).toBeInTheDocument();
+});

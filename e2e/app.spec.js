@@ -111,7 +111,12 @@ test('auto-hide offers the previous undo instead of discarding the stack', async
     .click();
   await expect(page.getByText('Deleted "Second task"')).toBeVisible();
 
-  // Wait out the 6‑second auto‑hide: the snackbar re‑opens for the previous
+  // Both delete buttons sit where the snackbar opens, so the pointer is
+  // left right over the alert. MUI pauses the auto‑hide timer while the
+  // snackbar is hovered, so move the pointer away like a user would.
+  await page.mouse.move(10, 10);
+
+  // Wait out the auto‑hide: the snackbar re‑opens for the previous
   // undo (with a fresh timer) instead of disappearing entirely.
   await page.waitForTimeout(6500);
   await expect(page.getByText('Deleted "First task"')).toBeVisible();
@@ -124,4 +129,39 @@ test('auto-hide offers the previous undo instead of discarding the stack', async
   await expect(page.getByRole('listitem', { name: 'Second task' })).toHaveCount(
     0,
   );
+});
+
+test('reorders tasks by dragging them onto another row', async ({ page }) => {
+  // A taller viewport so all three rows fit on screen: a drop whose
+  // coordinates fall outside the viewport never reaches the list.
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await page.goto('/');
+  const titleInput = page.getByLabel('Title');
+  const addBtn = page.getByRole('button', { name: 'Add Task' });
+  for (const name of ['First', 'Second', 'Third']) {
+    await titleInput.fill(name);
+    await addBtn.click();
+  }
+
+  // Drag "First" onto the lower half of "Third"'s row: a drop there
+  // inserts the task *after* that row, so it becomes the last one.
+  const third = page.getByRole('listitem', { name: 'Third' });
+  const box = await third.boundingBox();
+  await page
+    .getByRole('listitem', { name: 'First' })
+    .getByRole('button', { name: 'Reorder task' })
+    .dragTo(third, {
+      targetPosition: { x: box.width / 2, y: box.height * 0.8 },
+    });
+
+  const rows = page.getByRole('listitem');
+  expect(await rows.nth(0).textContent()).toContain('Second');
+  expect(await rows.nth(1).textContent()).toContain('Third');
+  expect(await rows.nth(2).textContent()).toContain('First');
+
+  // The new order is what gets persisted.
+  await page.reload();
+  expect(await rows.nth(0).textContent()).toContain('Second');
+  expect(await rows.nth(1).textContent()).toContain('Third');
+  expect(await rows.nth(2).textContent()).toContain('First');
 });

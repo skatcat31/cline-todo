@@ -151,6 +151,26 @@ export function tasksReducer(tasks, action) {
       [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
       return next;
     }
+    case 'reorder-task': {
+      // Move a task to another position (drag and drop): remove it and
+      // re‑insert it before or after the target task – the app passes the
+      // id of the row the task was dropped on plus which half of that row
+      // the drop landed in. Unknown ids, or dropping the task onto itself,
+      // leave the list untouched.
+      const { id, targetId, after } = action;
+      if (id === targetId) return tasks;
+      const fromIndex = tasks.findIndex((t) => t.id === id);
+      const targetIndex = tasks.findIndex((t) => t.id === targetId);
+      if (fromIndex === -1 || targetIndex === -1) return tasks;
+      const next = [...tasks];
+      const [moved] = next.splice(fromIndex, 1);
+      // If the moved task sat above the target, removing it shifted the
+      // target one slot up.
+      let insertAt = targetIndex - (fromIndex < targetIndex ? 1 : 0);
+      if (after) insertAt += 1;
+      next.splice(insertAt, 0, moved);
+      return next;
+    }
     case 'insert-tasks': {
       // Re‑insert previously removed tasks at their remembered
       // positions (used by "undo", for both single deletes and "clear
@@ -243,8 +263,9 @@ export function tasksReducer(tasks, action) {
  * persistence (lazy load before the first render, save on every change).
  *
  * Returns `{ tasks, persistFailed, addTask, toggleTask, deleteTask,
- * moveTask, insertTasks, editTask, addSubtask, toggleSubtask,
- * deleteSubtask, editSubtask, clearCompleted, replaceTasks }`.
+ * moveTask, reorderTask, insertTasks, editTask, addSubtask,
+ * toggleSubtask, deleteSubtask, editSubtask, clearCompleted,
+ * replaceTasks }`.
  * `addSubtask` returns the id of the created subtask so callers can move
  * focus to it after it has rendered. `persistFailed` is true after a
  * persistence attempt could not write to storage (quota exceeded,
@@ -305,6 +326,10 @@ export function useTasks() {
     // Swap a task with its neighbour in the full list (the app passes the
     // id of the adjacent task in the currently visible list).
     moveTask: (id, swapId) => dispatch({ type: 'move-task', id, swapId }),
+    // Move a task before/after another one (drag and drop: the ids are
+    // those of the dragged task and the row it was dropped on).
+    reorderTask: (id, targetId, after) =>
+      dispatch({ type: 'reorder-task', id, targetId, after }),
     // Re‑add previously removed tasks at their remembered positions
     // (used by "undo" - single deletes and "clear completed").
     insertTasks: (items) => dispatch({ type: 'insert-tasks', items }),

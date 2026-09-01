@@ -63,39 +63,45 @@ npm run dev # start the dev server
 
 ## Scripts
 
-| Script                 | Description                                                        |
-| ---------------------- | ------------------------------------------------------------------ |
-| `npm run dev`          | Start the Vite dev server                                          |
-| `npm test`             | Run the test suite once                                            |
-| `npm run test:watch`   | Run tests in watch mode                                            |
-| `npm run test:e2e`     | Playwright end‑to‑end tests (production build + service worker)    |
-| `npm run lint`         | ESLint over the whole project                                      |
-| `npm run format`       | Prettier (write)                                                   |
-| `npm run format:check` | Prettier (check)                                                   |
-| `npm run build`        | Production build into `dist/`                                      |
-| `npm run preview`      | Preview the production build locally                               |
-| `npm run icons`        | Regenerate the PWA icons from the favicon design (`public/icons/`) |
+| Script                 | Description                                                          |
+| ---------------------- | -------------------------------------------------------------------- |
+| `npm run dev`          | Start the Vite dev server                                            |
+| `npm test`             | Run the test suite once                                              |
+| `npm run test:watch`   | Run tests in watch mode                                              |
+| `npm run test:e2e`     | Playwright end‑to‑end tests (serves `dist/`, builds it when missing) |
+| `npm run lint`         | ESLint over the whole project                                        |
+| `npm run format`       | Prettier (write)                                                     |
+| `npm run format:check` | Prettier (check)                                                     |
+| `npm run build`        | Production build into `dist/`                                        |
+| `npm run size`         | Check the built bundle against its size budget (after a build)       |
+| `npm run preview`      | Preview the production build locally                                 |
+| `npm run icons`        | Regenerate the PWA icons from the favicon design (`public/icons/`)   |
 
 Coverage is enforced at 80% (statements, branches, functions and lines) in
-`vite.config.js`; run it with `npm test -- --coverage`. End‑to‑end tests
+`vite.config.js`; run it with `npm test -- --coverage`; on CI the HTML
+report is published as a `coverage` artifact. End‑to‑end tests
 (`e2e/`) run the core user flows plus the PWA service worker / offline
-behavior against a production build (`npm run test:e2e`).
+behavior against a production build (`npm run test:e2e`); on CI that is
+the build the `ci` job publishes. The production build is additionally
+checked against an explicit bundle‑size budget (`npm run size`, also run
+by the `ci` job): the main bundle is dominated by MUI, so a generic
+500 kB warning would be noise, but a sudden jump in the JavaScript size
+should fail the build.
 
 ## Project structure
 
 ```
 src/
-  App.jsx              App shell: task list layout, due‑date sort, reminders,
-                       export/import, undo + import dialogs and warning
-                       snackbars; the new‑task form, filter bar and theme
-                       toggle live in components/
+  App.jsx              App shell: task list layout, due‑date sort,
+                       reminders, export/import, undo state and the
+                       import‑error snackbar; the import dialog, undo
+                       snackbar and persist warning live in components/
   main.jsx             Entry point (mounts App behind the ErrorBoundary)
   theme.js             createAppTheme(mode): light + dark Material themes
   hooks/
     useTasks.js           Multi‑list state ({ lists, activeListId },
                        useReducer) + list and task mutations +
-                       localStorage persistence (versioned payload with a
-                       v1→v2 migration, lazy load, cross‑tab sync)
+                       localStorage persistence (lazy load, cross‑tab sync)
     usePersistentState.js useState mirrored into localStorage (best effort);
                        used for the filter and the due‑date sort
     useColorScheme.js   Color scheme (light/system/dark): persists the
@@ -118,6 +124,11 @@ src/
                        counter, "clear completed"
     SearchBar.jsx      Compact search box (the query is transient, owned by
                        the app; matching lives in utils/taskList.js)
+    ImportDialog.jsx   Confirmation before an import may replace the list
+                       (replace vs. merge)
+    UndoSnackbar.jsx   Multi‑level undo prompt after deletions
+    PersistWarning.jsx Persistent warning while storage writes fail
+    snackbarSx.js      Shared pointer‑transparent style for the snackbars
     ThemeToggle.jsx    Light / system / dark selector for the app bar
     Placeholder.jsx    Empty state
     ErrorBoundary.jsx  Last‑resort crash UI with a reload button
@@ -127,6 +138,12 @@ src/
     taskList.js        Pure list‑level operations: filtering, counters,
                        due‑date sorting, the "clear completed" undo payload
                        and import merging
+    taskNormalize.js   Coerces stored/imported tasks and lists to the
+                       canonical shape (shared by useTasks.js and
+                       taskFile.js)
+    taskPayload.js     The persisted payload: storage key + version,
+                       parsing with the v1→v2 upgrade and the default
+                       state the parser falls back to
     dates.js           Due‑date helpers: local "YYYY‑MM‑DD" dates, overdue
                        detection and display formatting
     filters.js         The FILTERS list (value + label) shared by FilterBar
@@ -142,10 +159,11 @@ src/
 
 - **GitHub Pages** – pushing to `main` runs the CI workflow
   (`.github/workflows/ci.yml`): a `ci` job (lint, format check, test with
-  coverage, build), an `e2e` job (Playwright) and a `deploy` job that
-  publishes `dist/` to GitHub Pages. The Vite `base` is derived from
-  `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path. GitHub
-  Pages cannot set response headers, so the build injects a
+  coverage, build, bundle‑size check), an `e2e` job (Playwright, run against the build the
+  `ci` job publishes) and a `deploy` job that rebuilds with the Pages
+  base path and publishes it to GitHub Pages. The Vite `base` is derived
+  from `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path.
+  GitHub Pages cannot set response headers, so the build injects a
   `Content-Security-Policy` meta tag into `index.html` instead.
 - **Docker** – a multi‑stage build compiles the site with Node and serves
   it with nginx (running as the unprivileged `nginx` user on port 8080);

@@ -68,26 +68,32 @@ export function useDueDateReminders(tasks) {
 
   // Announce the tasks that are due today and have not been announced
   // earlier today. The per‑day id log (keyed by date) survives reloads,
-  // so each task is announced at most once a day.
+  // so each task is announced at most once a day. Only today's log entry
+  // is ever written back – a day's log is only useful on that day, so
+  // older entries are pruned instead of accumulating.
   const announce = useCallback(() => {
     if (permission !== 'granted' || !enabled) return;
     if (typeof Notification === 'undefined') return;
     const today = todayISO();
-    let announced = new Set();
+    let log = {};
     try {
-      const log = JSON.parse(localStorage.getItem(REMINDERS_LOG_KEY) ?? '{}');
-      if (Array.isArray(log?.[today])) {
-        announced = new Set(log[today]);
+      const stored = JSON.parse(
+        localStorage.getItem(REMINDERS_LOG_KEY) ?? '{}',
+      );
+      if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+        log = stored;
       }
     } catch {
       // unreadable log – treat everything as not announced yet
     }
+    const announced = new Set(Array.isArray(log[today]) ? log[today] : []);
     const fresh = dueOnTasks(tasks).filter((task) => !announced.has(task.id));
     if (fresh.length === 0) return;
+    for (const date of Object.keys(log)) {
+      if (date !== today) delete log[date];
+    }
+    log[today] = [...announced, ...fresh.map((task) => task.id)];
     try {
-      const log =
-        JSON.parse(localStorage.getItem(REMINDERS_LOG_KEY) ?? '{}') || {};
-      log[today] = [...announced, ...fresh.map((task) => task.id)];
       localStorage.setItem(REMINDERS_LOG_KEY, JSON.stringify(log));
     } catch {
       // unwritable log – the reminder itself still goes out

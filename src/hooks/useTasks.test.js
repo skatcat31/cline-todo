@@ -1,13 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
-import {
-  STORAGE_KEY,
-  STORAGE_VERSION,
-  normalizeTasks,
-  parseStoredPayload,
-  tasksReducer,
-  useTasks,
-} from './useTasks.js';
+import { STORAGE_KEY, STORAGE_VERSION } from '../utils/taskPayload.js';
+import { tasksReducer, useTasks } from './useTasks.js';
 
 /**
  * Unit tests for the task state owned by `useTasks`. They exercise the hook
@@ -545,6 +539,48 @@ describe('tasksReducer', () => {
     ).toEqual(['x', 'a', 'b']);
   });
 
+  test('insert-tasks skips malformed items and ids that already exist', () => {
+    const existing = stateWith([
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+    ]);
+    const after = tasksReducer(existing, {
+      type: 'insert-tasks',
+      listId: 'l1',
+      items: [
+        // Malformed: the remembered task object is gone (stale undo entry).
+        { task: undefined, index: 0 },
+        // Not an object at all.
+        { task: 'garbage', index: 0 },
+        // Already present in the target list (another tab re‑added it).
+        {
+          task: { id: 'a', title: 'Duplicate', done: false, subtasks: [] },
+          index: 0,
+        },
+        // The only usable item.
+        { task: { id: 'x', title: 'X', done: false, subtasks: [] }, index: 0 },
+      ],
+    });
+    expect(taskIds(after)).toEqual(['x', 'a']);
+  });
+
+  test('insert-tasks leaves the state untouched when nothing is usable', () => {
+    const existing = stateWith([
+      { id: 'a', title: 'A', done: false, subtasks: [] },
+    ]);
+    const after = tasksReducer(existing, {
+      type: 'insert-tasks',
+      listId: 'l1',
+      items: [
+        { task: undefined, index: 0 },
+        {
+          task: { id: 'a', title: 'Duplicate', done: false, subtasks: [] },
+          index: 0,
+        },
+      ],
+    });
+    expect(after).toBe(existing);
+  });
+
   test('insert-tasks targets the given list and leaves the others alone', () => {
     const state = {
       lists: [
@@ -772,199 +808,5 @@ describe('tasksReducer', () => {
   test('delete-list keeps a single list (there is nothing to fall back to)', () => {
     const state = stateWith([]);
     expect(tasksReducer(state, { type: 'delete-list', id: 'l1' })).toBe(state);
-  });
-});
-
-describe('normalizeTasks', () => {
-  test('returns an empty list for non-array input', () => {
-    expect(normalizeTasks(null)).toEqual([]);
-    expect(normalizeTasks('nope')).toEqual([]);
-    expect(normalizeTasks({ tasks: [] })).toEqual([]);
-  });
-
-  test('drops entries that are not task-shaped and coerces the rest', () => {
-    const normalized = normalizeTasks([
-      'garbage',
-      null,
-      { id: 42, title: 7 },
-      { id: 't1', title: 'Task', done: 'yes', subtasks: 'nope' },
-    ]);
-    expect(normalized).toEqual([
-      {
-        id: 't1',
-        title: 'Task',
-        description: '',
-        due: null,
-        done: true,
-        subtasks: [],
-      },
-    ]);
-  });
-
-  test('keeps a valid due date and drops an invalid one', () => {
-    const normalized = normalizeTasks([
-      { id: 'a', title: 'Valid', due: '2026-09-10' },
-      { id: 'b', title: 'Impossible date', due: '2026-02-30' },
-      { id: 'c', title: 'Wrong shape', due: 42 },
-      { id: 'd', title: 'No due' },
-    ]);
-    expect(normalized.map((task) => task.due)).toEqual([
-      '2026-09-10',
-      null,
-      null,
-      null,
-    ]);
-  });
-
-  test('keeps valid subtasks and drops the invalid ones', () => {
-    const normalized = normalizeTasks([
-      {
-        id: 't1',
-        title: 'Task',
-        description: 'desc',
-        done: false,
-        subtasks: [
-          { id: 's1', title: 'Sub', description: null, done: 1 },
-          'junk',
-        ],
-      },
-    ]);
-    expect(normalized[0].subtasks).toEqual([
-      { id: 's1', title: 'Sub', description: '', done: true },
-    ]);
-  });
-});
-
-describe('parseStoredPayload', () => {
-  // The state the parser falls back to whenever the stored value is
-  // missing or unusable.
-  const defaultEmpty = {
-    lists: [{ id: 'default', name: 'To-Do', tasks: [] }],
-    activeListId: 'default',
-  };
-
-  test('reads a current versioned payload and keeps it as is', () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: STORAGE_VERSION,
-        activeListId: 'l2',
-        lists: [
-          {
-            id: 'l1',
-            name: 'First',
-            tasks: [
-              {
-                id: '1',
-                title: 'A',
-                description: '',
-                due: null,
-                done: false,
-                subtasks: [],
-              },
-            ],
-          },
-          { id: 'l2', name: 'Second', tasks: [] },
-        ],
-      }),
-    );
-    const payload = parseStoredPayload(localStorage.getItem(STORAGE_KEY));
-    expect(payload.activeListId).toBe('l2');
-    expect(payload.lists).toHaveLength(2);
-    expect(payload.lists[0].tasks).toEqual([
-      {
-        id: '1',
-        title: 'A',
-        description: '',
-        due: null,
-        done: false,
-        subtasks: [],
-      },
-    ]);
-  });
-
-  test('falls back to the first list when the active id is stale', () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: STORAGE_VERSION,
-        activeListId: 'gone',
-        lists: [{ id: 'l1', name: 'First', tasks: [] }],
-      }),
-    );
-    const payload = parseStoredPayload(localStorage.getItem(STORAGE_KEY));
-    expect(payload.activeListId).toBe('l1');
-  });
-
-  test('upgrades the legacy bare-array payload into a single list', () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify([
-        { id: '1', title: 'A', done: false, description: '', subtasks: [] },
-      ]),
-    );
-    const payload = parseStoredPayload(localStorage.getItem(STORAGE_KEY));
-    expect(payload.activeListId).toBe('default');
-    expect(payload.lists).toEqual([
-      {
-        id: 'default',
-        name: 'To-Do',
-        tasks: [
-          {
-            id: '1',
-            title: 'A',
-            description: '',
-            due: null,
-            done: false,
-            subtasks: [],
-          },
-        ],
-      },
-    ]);
-  });
-
-  test('upgrades the legacy versioned { tasks } payload into a single list', () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: STORAGE_VERSION,
-        tasks: [
-          { id: '1', title: 'A', done: false, description: '', subtasks: [] },
-        ],
-      }),
-    );
-    const payload = parseStoredPayload(localStorage.getItem(STORAGE_KEY));
-    expect(payload.lists).toHaveLength(1);
-    expect(payload.lists[0].name).toBe('To-Do');
-    expect(payload.lists[0].tasks).toHaveLength(1);
-  });
-
-  test('returns the default state for invalid JSON', () => {
-    localStorage.setItem(STORAGE_KEY, '{not valid json');
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    try {
-      expect(parseStoredPayload(localStorage.getItem(STORAGE_KEY))).toEqual(
-        defaultEmpty,
-      );
-    } finally {
-      errorSpy.mockRestore();
-    }
-  });
-
-  test('returns the default state when nothing is stored', () => {
-    localStorage.removeItem(STORAGE_KEY);
-    expect(parseStoredPayload(localStorage.getItem(STORAGE_KEY))).toEqual(
-      defaultEmpty,
-    );
-  });
-
-  test('returns the default state for an unrecognized shape', () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ version: 1, notLists: true }),
-    );
-    expect(parseStoredPayload(localStorage.getItem(STORAGE_KEY))).toEqual(
-      defaultEmpty,
-    );
   });
 });

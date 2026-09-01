@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Compatibility layer for jest-dom with Vitest
 import '@testing-library/jest-dom/vitest';
-import { STORAGE_VERSION } from './hooks/useTasks.js';
+import { STORAGE_VERSION } from './utils/taskPayload.js';
 import { test, expect, vi } from 'vitest';
 
 /**

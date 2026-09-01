@@ -1,4 +1,4 @@
-import { normalizeTasks } from '../hooks/useTasks.js';
+import { normalizeTasks } from './taskNormalize.js';
 
 /**
  * File‑level helpers for exporting and importing the task list as JSON.

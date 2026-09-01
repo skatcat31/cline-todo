@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "icons": "node scripts/generate-icons.mjs",
+    "size": "node scripts/check-bundle-size.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

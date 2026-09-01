@@ -98,6 +98,14 @@ export default defineConfig({
   base: process.env.GITHUB_REPOSITORY
     ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/`
     : '/',
+  // The main bundle is ~500 kB minified and dominated by MUI, so Vite's
+  // default 500 kB chunk warning fires on every build without saying
+  // anything new. The real guardrail is the explicit bundle‑size budget
+  // (scripts/check-bundle-size.mjs, run by the `ci` job); the limit is
+  // set to the same value so Vite's warning and that budget agree.
+  build: {
+    chunkSizeWarningLimit: 600,
+  },
   // Vitest configuration – use jsdom environment for DOM APIs
   test: {
     environment: 'jsdom',

@@ -11,10 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Lint, format check, unit tests (with coverage gate) and the production
-  # build. The built app (root base path) is published as an artifact that
-  # the e2e job serves and tests; the deploy job rebuilds with the GitHub
-  # Pages base path.
+  # Lint, format check, unit tests (with coverage gate), the production
+  # build and the bundle size check. The built app (root base path) is
+  # published as an artifact that the e2e job serves and tests; the
+  # deploy job rebuilds with the GitHub Pages base path.
   ci:
     runs-on: ubuntu-latest
     steps:
@@ -45,6 +45,13 @@ jobs:
       # Pages sub‑path base in vite.config.js.
       - name: Build for production
         run: npm run build -- --base=/
+
+      # The main bundle is dominated by MUI, so Vite's default 500 kB
+      # chunk warning fires on every build; the real guardrail is this
+      # explicit budget (scripts/check-bundle-size.mjs), which is set to
+      # the same value as build.chunkSizeWarningLimit in vite.config.js.
+      - name: Check bundle size
+        run: npm run size
 
       - name: Upload built app
         uses: actions/upload-artifact@v7

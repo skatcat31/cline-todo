@@ -73,6 +73,7 @@ npm run dev # start the dev server
 | `npm run format`       | Prettier (write)                                                     |
 | `npm run format:check` | Prettier (check)                                                     |
 | `npm run build`        | Production build into `dist/`                                        |
+| `npm run size`         | Check the built bundle against its size budget (after a build)       |
 | `npm run preview`      | Preview the production build locally                                 |
 | `npm run icons`        | Regenerate the PWA icons from the favicon design (`public/icons/`)   |
 
@@ -80,7 +81,11 @@ Coverage is enforced at 80% (statements, branches, functions and lines) in
 `vite.config.js`; run it with `npm test -- --coverage`. End‑to‑end tests
 (`e2e/`) run the core user flows plus the PWA service worker / offline
 behavior against a production build (`npm run test:e2e`); on CI that is
-the build the `ci` job publishes.
+the build the `ci` job publishes. The production build is additionally
+checked against an explicit bundle‑size budget (`npm run size`, also run
+by the `ci` job): the main bundle is dominated by MUI, so a generic
+500 kB warning would be noise, but a sudden jump in the JavaScript size
+should fail the build.
 
 ## Project structure
 
@@ -153,7 +158,7 @@ src/
 
 - **GitHub Pages** – pushing to `main` runs the CI workflow
   (`.github/workflows/ci.yml`): a `ci` job (lint, format check, test with
-  coverage, build), an `e2e` job (Playwright, run against the build the
+  coverage, build, bundle‑size check), an `e2e` job (Playwright, run against the build the
   `ci` job publishes) and a `deploy` job that rebuilds with the Pages
   base path and publishes it to GitHub Pages. The Vite `base` is derived
   from `GITHUB_REPOSITORY` so asset URLs work under the repo sub‑path.

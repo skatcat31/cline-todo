@@ -59,6 +59,21 @@ export function mergeTasks(existing, incoming) {
 }
 
 /**
+ * The tasks in due‑date order (earliest first). Tasks without a due date
+ * go to the end, keeping their original relative order (the sort is
+ * stable). Returns a new array; the input list is not modified. ISO
+ * "YYYY‑MM‑DD" dates compare correctly as plain strings.
+ */
+export function sortTasksByDue(tasks) {
+  return [...tasks].sort((a, b) => {
+    if (a.due && b.due) return a.due < b.due ? -1 : a.due > b.due ? 1 : 0;
+    if (a.due) return -1;
+    if (b.due) return 1;
+    return 0;
+  });
+}
+
+/**
  * The tasks matching a search query (case‑insensitive substring match on
  * the task title, the task description or any subtask title). An empty or
  * whitespace‑only query matches every task.

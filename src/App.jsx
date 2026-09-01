@@ -32,6 +32,7 @@ import {
   completedItems,
   indexOfTask,
   mergeTasks,
+  sortTasksByDue,
   tasksMatching,
   taskCounts,
   visibleTasks,
@@ -41,6 +42,11 @@ import {
 // values are the entries of FILTERS, imported from utils/filters.js;
 // anything else falls back to "all").
 const FILTER_KEY = 'todo-filter';
+
+// localStorage key under which the active sort is remembered (the legal
+// values are "none" – the manual list order – and "due" – earliest due
+// date first; anything else falls back to "none").
+const SORT_KEY = 'todo-sort';
 
 // How many deletion actions the undo snackbar remembers (multi‑level
 // undo): new actions push onto the end of the stack and the oldest one is
@@ -97,6 +103,20 @@ function App() {
       return 'all';
     }
   });
+  // Whether the list is shown in due‑date order instead of the manual
+  // list order – remembered across reloads, like the filter.
+  const [sort, setSort] = usePersistentState(SORT_KEY, () => {
+    try {
+      return localStorage.getItem(SORT_KEY) === 'due' ? 'due' : 'none';
+    } catch {
+      return 'none';
+    }
+  });
+  const sortActive = sort === 'due';
+  // Manual reordering (move up/down, drag and drop) only makes sense in
+  // the manual list order; while the due‑date sort is on it would be
+  // hidden by the derived ordering, so the controls are disabled.
+  const canReorder = !sortActive;
   // The current search query: a transient view filter (title, description
   // or subtask title), unlike the status filter it is not persisted.
   const [search, setSearch] = useState('');
@@ -303,7 +323,13 @@ function App() {
 
   // The task list as shown by the search query and the active filter, plus
   // the counters the filter bar shows (pure helpers from utils/taskList.js).
-  const shownTasks = visibleTasks(tasksMatching(tasks, search), filter);
+  // The tasks in the order shown in the list card: search and filter are
+  // applied to the full list; the due‑date sort (when active) reorders
+  // the result. It is a view order only – the stored manual order is
+  // never changed by it.
+  const shownTasks = sortActive
+    ? sortTasksByDue(visibleTasks(tasksMatching(tasks, search), filter))
+    : visibleTasks(tasksMatching(tasks, search), filter);
   const {
     active: activeCount,
     completed: completedCount,
@@ -378,6 +404,8 @@ function App() {
             <FilterBar
               filter={filter}
               onFilterChange={setFilter}
+              sort={sort}
+              onSortChange={setSort}
               activeCount={activeCount}
               totalCount={totalCount}
               completedCount={completedCount}
@@ -419,10 +447,11 @@ function App() {
                     onToggleSubtask={toggleSubtask}
                     onDeleteSubtask={deleteSubtask}
                     onEditSubtask={editSubtask}
-                    canMoveUp={position > 0}
-                    canMoveDown={position < shownTasks.length - 1}
+                    canMoveUp={position > 0 && canReorder}
+                    canMoveDown={position < shownTasks.length - 1 && canReorder}
                     onMoveUp={() => handleMoveTask(task.id, 'up')}
                     onMoveDown={() => handleMoveTask(task.id, 'down')}
+                    canReorder={canReorder}
                     dragTask={dragTask}
                     onDragStartTask={handleDragStartTask}
                     onDragOverTask={handleDragOverTask}

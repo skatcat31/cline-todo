@@ -111,3 +111,41 @@ test('offers clear-completed only for completed tasks and reports clicks', async
   );
   expect(onClearCompleted).toHaveBeenCalledTimes(1);
 });
+
+test('toggles the due‑date sort off by default and reports the new value', async () => {
+  const onSortChange = vi.fn();
+  render(
+    <FilterBar
+      filter="all"
+      onFilterChange={vi.fn()}
+      sort="none"
+      onSortChange={onSortChange}
+      activeCount={1}
+      totalCount={2}
+      completedCount={0}
+      onClearCompleted={vi.fn()}
+    />,
+  );
+  const toggle = screen.getByRole('button', { name: 'Sort by due date' });
+  expect(toggle).not.toBePressed();
+  await userEvent.click(toggle);
+  expect(onSortChange).toHaveBeenCalledWith('due');
+});
+
+test('marks the due‑date sort as pressed while it is selected', () => {
+  render(
+    <FilterBar
+      filter="all"
+      onFilterChange={vi.fn()}
+      sort="due"
+      onSortChange={vi.fn()}
+      activeCount={1}
+      totalCount={2}
+      completedCount={0}
+      onClearCompleted={vi.fn()}
+    />,
+  );
+  expect(
+    screen.getByRole('button', { name: 'Sort by due date' }),
+  ).toBePressed();
+});

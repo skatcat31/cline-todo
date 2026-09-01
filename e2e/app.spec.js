@@ -59,6 +59,37 @@ test('shows the due date of a task', async ({ page }) => {
   await expect(page.getByText('Due May 1, 2999')).toBeVisible();
 });
 
+test('sorts the list by due date and remembers the choice', async ({ page }) => {
+  await page.goto('/');
+  const titleInput = page.getByLabel('Title');
+  const dueInput = page.getByLabel('Due date (optional)');
+  const addBtn = page.getByRole('button', { name: 'Add Task' });
+
+  await titleInput.fill('Later task');
+  await dueInput.fill('2999-02-01');
+  await addBtn.click();
+  await titleInput.fill('Earlier task');
+  await dueInput.fill('2999-01-01');
+  await addBtn.click();
+
+  // The manual list order by default
+  const rows = page.getByRole('listitem');
+  expect(await rows.nth(0).textContent()).toContain('Later task');
+  expect(await rows.nth(1).textContent()).toContain('Earlier task');
+
+  // The due‑date sort puts the earliest due date first
+  await page.getByRole('button', { name: 'Sort by due date' }).click();
+  expect(await rows.nth(0).textContent()).toContain('Earlier task');
+  expect(await rows.nth(1).textContent()).toContain('Later task');
+
+  // The choice is remembered across a reload
+  await page.reload();
+  await expect(
+    page.getByRole('button', { name: 'Sort by due date' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  expect(await rows.nth(0).textContent()).toContain('Earlier task');
+});
+
 test('undoes several deletions in reverse order', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Title').fill('First task');

@@ -90,6 +90,27 @@ describe('useDueDateReminders', () => {
     });
   });
 
+  test('drops log entries for previous days when writing today’s log', () => {
+    // A stale entry from an earlier day plus today's entry (t1 already
+    // announced today, t2 not yet).
+    localStorage.setItem(
+      'todo-reminder-log',
+      JSON.stringify({ '2020-01-01': ['stale'], [todayISO()]: ['t1'] }),
+    );
+    renderHook(() =>
+      useDueDateReminders([task('t1', 'Task A'), task('t2', 'Task B')]),
+    );
+    // Only the fresh task is announced…
+    expect(MockNotification.instances).toHaveLength(1);
+    expect(MockNotification.instances[0].body).toBe('Task B');
+    // …and the stored log now holds today's entry only: the stale day is
+    // pruned, and both t1 and t2 are listed so neither is announced again
+    // today.
+    const log = JSON.parse(localStorage.getItem('todo-reminder-log'));
+    expect(Object.keys(log)).toEqual([todayISO()]);
+    expect(log[todayISO()]).toEqual(['t1', 't2']);
+  });
+
   test('requests permission and starts announcing once granted', async () => {
     MockNotification.permission = 'default';
     // The user grants permission in the browser prompt.

@@ -1,5 +1,11 @@
 import { useEffect, useReducer, useState } from 'react';
 import { normalizeDue } from '../utils/dates.js';
+import {
+  DEFAULT_LIST_ID,
+  DEFAULT_LIST_NAME,
+  normalizeList,
+  normalizeTasks,
+} from '../utils/taskNormalize.js';
 
 // localStorage key under which the task lists are persisted.
 export const STORAGE_KEY = 'tasks';
@@ -10,11 +16,6 @@ export const STORAGE_KEY = 'tasks';
 // silently losing data.
 export const STORAGE_VERSION = 2;
 
-// Id / name of the single list that pre‑v2 payloads (and fresh storage)
-// are upgraded to.
-const DEFAULT_LIST_ID = 'default';
-const DEFAULT_LIST_NAME = 'To-Do';
-
 // Generate a unique id for new tasks, subtasks and lists. `crypto`
 // .randomUUID is only available in secure contexts (https, localhost),
 // so fall back to a time/random based id elsewhere instead of crashing.
@@ -22,70 +23,6 @@ const nextId = () =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-
-/**
- * Validate and normalize a task list loaded from storage.
- *
- * localStorage is not trustworthy (older app versions, hand edits or a
- * half-written value can produce a malformed shape), so anything that does
- * not look like a task/subtask is dropped and the remaining entries are
- * coerced to the exact shape the UI expects.
- */
-export function normalizeTasks(value) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter(
-      (task) =>
-        task &&
-        typeof task === 'object' &&
-        typeof task.id === 'string' &&
-        typeof task.title === 'string',
-    )
-    .map((task) => ({
-      id: task.id,
-      title: task.title,
-      description: typeof task.description === 'string' ? task.description : '',
-      due: normalizeDue(task.due),
-      done: Boolean(task.done),
-      subtasks: Array.isArray(task.subtasks)
-        ? task.subtasks
-            .filter(
-              (subtask) =>
-                subtask &&
-                typeof subtask === 'object' &&
-                typeof subtask.id === 'string' &&
-                typeof subtask.title === 'string',
-            )
-            .map((subtask) => ({
-              id: subtask.id,
-              title: subtask.title,
-              description:
-                typeof subtask.description === 'string'
-                  ? subtask.description
-                  : '',
-              done: Boolean(subtask.done),
-            }))
-        : [],
-    }));
-}
-
-// Normalize one stored list entry to { id, name, tasks }: entries without
-// a usable string id get a generated one, and a missing/blank name falls
-// back to the default list name.
-function normalizeList(value, index) {
-  const id =
-    value && typeof value === 'object' && typeof value.id === 'string'
-      ? value.id
-      : `list-${index}`;
-  const name =
-    value &&
-    typeof value === 'object' &&
-    typeof value.name === 'string' &&
-    value.name.trim()
-      ? value.name
-      : DEFAULT_LIST_NAME;
-  return { id, name, tasks: normalizeTasks(value ? value.tasks : undefined) };
-}
 
 // The state everything falls back to: a single empty default list.
 function defaultState() {

@@ -3,7 +3,6 @@ import { describe, expect, test, vi } from 'vitest';
 import {
   STORAGE_KEY,
   STORAGE_VERSION,
-  normalizeTasks,
   parseStoredPayload,
   tasksReducer,
   useTasks,
@@ -772,66 +771,6 @@ describe('tasksReducer', () => {
   test('delete-list keeps a single list (there is nothing to fall back to)', () => {
     const state = stateWith([]);
     expect(tasksReducer(state, { type: 'delete-list', id: 'l1' })).toBe(state);
-  });
-});
-
-describe('normalizeTasks', () => {
-  test('returns an empty list for non-array input', () => {
-    expect(normalizeTasks(null)).toEqual([]);
-    expect(normalizeTasks('nope')).toEqual([]);
-    expect(normalizeTasks({ tasks: [] })).toEqual([]);
-  });
-
-  test('drops entries that are not task-shaped and coerces the rest', () => {
-    const normalized = normalizeTasks([
-      'garbage',
-      null,
-      { id: 42, title: 7 },
-      { id: 't1', title: 'Task', done: 'yes', subtasks: 'nope' },
-    ]);
-    expect(normalized).toEqual([
-      {
-        id: 't1',
-        title: 'Task',
-        description: '',
-        due: null,
-        done: true,
-        subtasks: [],
-      },
-    ]);
-  });
-
-  test('keeps a valid due date and drops an invalid one', () => {
-    const normalized = normalizeTasks([
-      { id: 'a', title: 'Valid', due: '2026-09-10' },
-      { id: 'b', title: 'Impossible date', due: '2026-02-30' },
-      { id: 'c', title: 'Wrong shape', due: 42 },
-      { id: 'd', title: 'No due' },
-    ]);
-    expect(normalized.map((task) => task.due)).toEqual([
-      '2026-09-10',
-      null,
-      null,
-      null,
-    ]);
-  });
-
-  test('keeps valid subtasks and drops the invalid ones', () => {
-    const normalized = normalizeTasks([
-      {
-        id: 't1',
-        title: 'Task',
-        description: 'desc',
-        done: false,
-        subtasks: [
-          { id: 's1', title: 'Sub', description: null, done: 1 },
-          'junk',
-        ],
-      },
-    ]);
-    expect(normalized[0].subtasks).toEqual([
-      { id: 's1', title: 'Sub', description: '', done: true },
-    ]);
   });
 });
 

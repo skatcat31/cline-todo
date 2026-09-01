@@ -95,8 +95,7 @@ src/
   hooks/
     useTasks.js           Multi‑list state ({ lists, activeListId },
                        useReducer) + list and task mutations +
-                       localStorage persistence (versioned payload with a
-                       v1→v2 migration, lazy load, cross‑tab sync)
+                       localStorage persistence (lazy load, cross‑tab sync)
     usePersistentState.js useState mirrored into localStorage (best effort);
                        used for the filter and the due‑date sort
     useColorScheme.js   Color scheme (light/system/dark): persists the
@@ -131,6 +130,9 @@ src/
     taskNormalize.js   Coerces stored/imported tasks and lists to the
                        canonical shape (shared by useTasks.js and
                        taskFile.js)
+    taskPayload.js     The persisted payload: storage key + version,
+                       parsing with the v1→v2 upgrade and the default
+                       state the parser falls back to
     dates.js           Due‑date helpers: local "YYYY‑MM‑DD" dates, overdue
                        detection and display formatting
     filters.js         The FILTERS list (value + label) shared by FilterBar

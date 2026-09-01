@@ -194,6 +194,10 @@ function App() {
   // new‑task title field when the list becomes empty.
   const handleDeleteTask = (id) => {
     const index = indexOfTask(tasks, id);
+    // The task may already be gone when this handler runs (a cross‑tab
+    // sync can remove it right after the row was rendered): then there is
+    // nothing to delete, and no undo entry to remember either.
+    if (index === -1) return;
     const task = tasks[index];
     const remaining = tasks.filter((t) => t.id !== id);
     deleteTask(id);

@@ -23,6 +23,9 @@ browser's `localStorage`.
   it behaves sensibly while a filter is active)
 - Due dates on tasks: set when adding or editing; overdue and due‑today
   tasks are highlighted
+- "Sort by due date" shows the visible list earliest‑due‑first (undated
+  tasks last) instead of the manual order; the choice is remembered across
+  reloads, and the manual reorder controls are disabled while it is on
 - Automatic persistence to `localStorage`, including cross‑tab sync
 - Export the task list as a JSON file; importing into a non‑empty list asks
   whether to replace it or merge the imported tasks into it

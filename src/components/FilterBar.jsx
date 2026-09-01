@@ -5,12 +5,14 @@ import Typography from '@mui/material/Typography';
 import { FILTERS } from '../utils/filters.js';
 
 /**
- * Filter bar: All / Active / Completed buttons, the "N of M tasks active"
- * counter and the "Clear completed" action (only shown while completed
- * tasks exist).
+ * Filter bar: All / Active / Completed buttons, the "Sort by due date"
+ * toggle, the "N of M tasks active" counter and the "Clear completed"
+ * action (only shown while completed tasks exist).
  * Props:
  *   filter - the active filter value ("all" | "active" | "completed")
  *   onFilterChange - receives the newly selected filter value
+ *   sort - the active sort ("none" | "due")
+ *   onSortChange - receives the newly selected sort value
  *   activeCount - number of not‑yet‑done tasks
  *   totalCount - number of all tasks
  *   completedCount - number of done tasks
@@ -19,6 +21,8 @@ import { FILTERS } from '../utils/filters.js';
 export default function FilterBar({
   filter,
   onFilterChange,
+  sort = 'none',
+  onSortChange,
   activeCount,
   totalCount,
   completedCount,
@@ -38,6 +42,16 @@ export default function FilterBar({
           </Button>
         ))}
       </ButtonGroup>
+      {/* Toggle the due‑date sort: shows the (filtered) list ordered by
+          due date instead of the manual list order. */}
+      <Button
+        size="small"
+        variant={sort === 'due' ? 'contained' : 'text'}
+        aria-pressed={sort === 'due'}
+        onClick={() => onSortChange(sort === 'due' ? 'none' : 'due')}
+      >
+        Sort by due date
+      </Button>
       <Typography
         variant="body2"
         color="text.secondary"

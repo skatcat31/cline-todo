@@ -47,6 +47,9 @@ import { dueBadge } from '../utils/dates.js';
  *   onDropTask - called with (this task's id, dropped‑in‑lower‑half) when
  *                a drag is dropped on this row
  *   onDragEndTask - called when the drag ends (drop or cancel)
+ *   canReorder - whether the drag handle is enabled (false while a
+ *                derived ordering, e.g. the due‑date sort, is active –
+ *                manual reordering would be hidden by it)
  *   focusToken - a changing, non-null token that moves focus to this
  *                task's checkbox (the parent sets it for the task that
  *                now occupies a just-deleted task's position; a token
@@ -70,6 +73,7 @@ export default function TaskItem({
   onDragOverTask,
   onDropTask,
   onDragEndTask,
+  canReorder = true,
   focusToken = null,
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -228,13 +232,16 @@ export default function TaskItem({
         sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 5, mt: 0.5 }}
       >
         {/* Drag handle: starts an HTML5 drag; dropping the task on
-            another row reorders it. The move up/down buttons below stay
-            available for keyboard users. */}
+            another row reorders it (the move up/down buttons below are
+            the keyboard‑accessible alternative). Disabled – like those
+            buttons – while a derived ordering (due‑date sort) is
+            active. */}
         <IconButton
           size="small"
           aria-label="Reorder task"
           title="Drag to move the task"
-          draggable
+          draggable={canReorder}
+          disabled={!canReorder}
           onDragStart={(event) => {
             // Firefox requires data to be set for the drag to start.
             if (event.dataTransfer) {

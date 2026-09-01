@@ -17,6 +17,8 @@ import Typography from '@mui/material/Typography';
 import { ThemeProvider } from '@mui/material/styles';
 import FileDownload from '@mui/icons-material/FileDownload';
 import FileUpload from '@mui/icons-material/FileUpload';
+import NotificationsActive from '@mui/icons-material/NotificationsActive';
+import NotificationsNone from '@mui/icons-material/NotificationsNone';
 import FilterBar from './components/FilterBar.jsx';
 import NewTaskForm from './components/NewTaskForm.jsx';
 import Placeholder from './components/Placeholder.jsx';
@@ -24,6 +26,7 @@ import SearchBar from './components/SearchBar.jsx';
 import TaskItem from './components/TaskItem.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
 import { useColorScheme } from './hooks/useColorScheme.js';
+import { useDueDateReminders } from './hooks/useDueDateReminders.js';
 import { usePersistentState } from './hooks/usePersistentState.js';
 import { useTasks } from './hooks/useTasks.js';
 import { FILTERS } from './utils/filters.js';
@@ -92,6 +95,12 @@ function App() {
     clearCompleted,
     replaceTasks,
   } = useTasks();
+  // Local due‑date reminders: with the notification permission granted
+  // (and the feature switched on), the hook announces the tasks that are
+  // due today – once per day per task. The app‑bar button asks for the
+  // permission or toggles the on/off choice.
+  const { permission, enabled, requestPermission, toggleEnabled } =
+    useDueDateReminders(tasks);
   // Which list to show: "all", "active" or "completed" – remembered in
   // localStorage (via usePersistentState) so a reload restores the
   // previous view.
@@ -366,6 +375,31 @@ function App() {
               onClick={handleImportClick}
             >
               <FileUpload fontSize="small" />
+            </IconButton>
+            {/* Due‑date reminders: without permission the click asks the
+                browser for it (a user gesture is required); with
+                permission it toggles the on/off choice. The filled icon
+                marks the enabled state. */}
+            <IconButton
+              color="inherit"
+              aria-label={
+                permission === 'granted'
+                  ? enabled
+                    ? 'Turn off due‑date reminders'
+                    : 'Turn on due‑date reminders'
+                  : 'Enable due‑date reminders'
+              }
+              title="Remind me about tasks that are due today"
+              disabled={permission === 'denied' || permission === 'unsupported'}
+              onClick={() =>
+                permission === 'granted' ? toggleEnabled() : requestPermission()
+              }
+            >
+              {permission === 'granted' && enabled ? (
+                <NotificationsActive fontSize="small" />
+              ) : (
+                <NotificationsNone fontSize="small" />
+              )}
             </IconButton>
             {/* Color‑scheme selector (light / system / dark); the choice is
                 persisted by useColorScheme */}

@@ -26,6 +26,8 @@ browser's `localStorage`.
 - "Sort by due date" shows the visible list earliest‑due‑first (undated
   tasks last) instead of the manual order; the choice is remembered across
   reloads, and the manual reorder controls are disabled while it is on
+- Local due‑date reminders: with browser notifications allowed, tasks that
+  are due today are announced once per day per task (app‑bar toggle)
 - Automatic persistence to `localStorage`, including cross‑tab sync
 - Export the task list as a JSON file; importing into a non‑empty list asks
   whether to replace it or merge the imported tasks into it
@@ -78,20 +80,23 @@ behavior against a production build (`npm run test:e2e`).
 
 ```
 src/
-  App.jsx              App shell: task list layout, export/import, undo +
-                       import dialogs and warning snackbars; the new‑task
-                       form, filter bar and theme toggle live in
-                       components/
+  App.jsx              App shell: task list layout, due‑date sort, reminders,
+                       export/import, undo + import dialogs and warning
+                       snackbars; the new‑task form, filter bar and theme
+                       toggle live in components/
   main.jsx             Entry point (mounts App behind the ErrorBoundary)
   theme.js             createAppTheme(mode): light + dark Material themes
   hooks/
     useTasks.js           Task state (useReducer) + mutations + localStorage
                        persistence (lazy load, cross‑tab sync)
     usePersistentState.js useState mirrored into localStorage (best effort);
-                       used for the filter
+                       used for the filter and the due‑date sort
     useColorScheme.js   Color scheme (light/system/dark): persists the
                        choice, follows the OS preference live in "system"
                        mode, marks <html class="dark">
+    useDueDateReminders.js Due‑date reminders: owns the Notification
+                       permission + on/off choice and announces the tasks
+                       due today (once per day per task, via a per‑day log)
   components/
     TaskItem.jsx       One task row, its edit form, subtask progress and
                        subtask management (focusToken moves focus to its
@@ -109,12 +114,15 @@ src/
   utils/
     taskFile.js        JSON export/import helpers (serialize, download,
                        parse + validate)
-    taskList.js        Pure list‑level operations: filtering, counters, the
-                       "clear completed" undo payload and import merging
+    taskList.js        Pure list‑level operations: filtering, counters,
+                       due‑date sorting, the "clear completed" undo payload
+                       and import merging
     dates.js           Due‑date helpers: local "YYYY‑MM‑DD" dates, overdue
                        detection and display formatting
     filters.js         The FILTERS list (value + label) shared by FilterBar
                        and the app‑level filter validation
+    reminders.js       Due‑reminder payload: which tasks are due on a date
+                       and the summary notification text for them
   test/
     setup.js           Vitest setup (localStorage polyfill, per‑test
                        isolation, RTL cleanup)

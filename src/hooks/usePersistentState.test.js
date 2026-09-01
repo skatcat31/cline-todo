@@ -13,11 +13,13 @@ test('starts with the value computed by the lazy initializer', () => {
   expect(result.current[0]).toBe('completed');
 });
 
-test('updates the value and mirrors it into localStorage', () => {
+test('does not re‑write the initial value, but mirrors updates into localStorage', () => {
   const { result } = renderHook(() =>
     usePersistentState('my-key', () => 'light'),
   );
-  expect(localStorage.getItem('my-key')).toBe('light');
+  // The initial value was just loaded – writing it back would only
+  // duplicate what storage already holds, so nothing is written yet.
+  expect(localStorage.getItem('my-key')).toBeNull();
   act(() => {
     result.current[1]('dark');
   });
@@ -27,8 +29,7 @@ test('updates the value and mirrors it into localStorage', () => {
 
 test('swallows failing writes so storage-unavailable browsers stay usable', () => {
   // The test setup polyfills localStorage as a plain object, so the spy is
-  // installed on the instance (and catches every write, the initial one
-  // included).
+  // installed on the instance (and catches the write of the update).
   const setItemSpy = vi
     .spyOn(window.localStorage, 'setItem')
     .mockImplementation(() => {
@@ -42,10 +43,10 @@ test('swallows failing writes so storage-unavailable browsers stay usable', () =
       result.current[1]('dark');
     });
   }).not.toThrow();
-  // The value still updates in memory: the initial write and the update were
-  // both attempted (and both swallowed).
+  // The value still updates in memory: the update was attempted (and
+  // swallowed) – the initial value is not written at all.
   expect(result.current[0]).toBe('dark');
-  expect(setItemSpy).toHaveBeenCalledTimes(2);
+  expect(setItemSpy).toHaveBeenCalledTimes(1);
   expect(setItemSpy.mock.calls.at(-1)).toEqual(['my-key', 'dark']);
   setItemSpy.mockRestore();
 });

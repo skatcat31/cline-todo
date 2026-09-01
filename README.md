@@ -1,11 +1,15 @@
 # agentic-todo
 
 A To‑Do list application built with React 19, Vite and Material UI (MUI 9).
-Tasks can have nested subtasks, and the whole list is persisted in the
-browser's `localStorage`.
+Tasks live in multiple named lists, can have nested subtasks, and are all
+persisted in the browser's `localStorage`.
 
 ## Features
 
+- Multiple task lists: create, rename, delete and switch between them
+  (tabs under the app bar); every list keeps its own tasks, the active
+  list is remembered across reloads, and the last remaining list cannot
+  be deleted
 - Add, edit and delete tasks with optional descriptions – deletions (and
   "Clear completed") offer an "Undo" snackbar; it remembers the last five
   deletions and undoes them one by one, most recent first. When the
@@ -29,8 +33,9 @@ browser's `localStorage`.
 - Local due‑date reminders: with browser notifications allowed, tasks that
   are due today are announced once per day per task (app‑bar toggle)
 - Automatic persistence to `localStorage`, including cross‑tab sync
-- Export the task list as a JSON file; importing into a non‑empty list asks
-  whether to replace it or merge the imported tasks into it
+- Export the active list's tasks as a JSON file; importing into a non‑empty
+  list asks whether to replace it or merge the imported tasks into it
+  (always the active list)
 - Color scheme: light / system / dark (app‑bar selector); the choice is
   persisted and the system option follows the OS preference live
 - Progressive Web App: installable (SVG + 192/512 PNG + maskable icons) and
@@ -87,8 +92,10 @@ src/
   main.jsx             Entry point (mounts App behind the ErrorBoundary)
   theme.js             createAppTheme(mode): light + dark Material themes
   hooks/
-    useTasks.js           Task state (useReducer) + mutations + localStorage
-                       persistence (lazy load, cross‑tab sync)
+    useTasks.js           Multi‑list state ({ lists, activeListId },
+                       useReducer) + list and task mutations +
+                       localStorage persistence (versioned payload with a
+                       v1→v2 migration, lazy load, cross‑tab sync)
     usePersistentState.js useState mirrored into localStorage (best effort);
                        used for the filter and the due‑date sort
     useColorScheme.js   Color scheme (light/system/dark): persists the
@@ -104,6 +111,9 @@ src/
     SubtaskItem.jsx    One subtask row with an inline edit form
     SubtaskForm.jsx    Inline "add subtask" form (owns its draft state)
     NewTaskForm.jsx    New‑task card form (owns its draft state)
+    ListTabs.jsx       One tab per list (active one selected) + list
+                       management: the "New list" dialog and the options
+                       menu with rename/delete (both confirm in dialogs)
     FilterBar.jsx      All/Active/Completed buttons, active‑task
                        counter, "clear completed"
     SearchBar.jsx      Compact search box (the query is transient, owned by

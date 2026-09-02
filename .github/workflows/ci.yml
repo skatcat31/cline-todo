@@ -130,12 +130,13 @@ jobs:
       - name: Run end-to-end tests
         run: npx playwright test
 
-  # Publish the built app to GitHub Pages (main branch only). The gh-pages
-  # branch is the Pages source for this repository. The deploy job rebuilds
-  # from source (rather than reusing the ci job's artifact) because GitHub
-  # Pages needs the repository sub‑path base, while the ci job builds with
-  # the root base for the e2e job. Deployment is gated on the e2e job as
-  # well, so a broken user flow never reaches the live site.
+  # Publish the built app to GitHub Pages (main branch only), via the
+  # official Pages actions (the Pages source in Settings → Pages must be
+  # "GitHub Actions", not a branch). The deploy job rebuilds from source
+  # (rather than reusing the ci job's artifact) because GitHub Pages needs
+  # the repository sub‑path base, while the ci job builds with the root
+  # base for the e2e job. Deployment is gated on the e2e job as well, so
+  # a broken user flow never reaches the live site.
   deploy:
     runs-on: ubuntu-latest
     needs: [ci, e2e]
@@ -153,16 +154,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Enables the Pages environment for the runner (sets the Pages
+      # origin and other deploy‑pages inputs).
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       # GITHUB_REPOSITORY is set on the runner, so this builds with the
       # GitHub Pages sub‑path base (see vite.config.js).
       - name: Build for production
         run: npm run build
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4.1.0
+      # Hands the build output to the Pages deployer (instead of pushing a
+      # gh‑pages branch, which the previous peaceiris action did).
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
       # Announce where the site was deployed. Uses the default *.github.io
       # domain; update this if a custom domain is ever configured.

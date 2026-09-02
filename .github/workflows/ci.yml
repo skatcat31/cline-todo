@@ -10,6 +10,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only token by default (checkout/build/test need no more). The deploy
+# job below elevates to the Pages permissions it actually needs, since only
+# it talks to the GitHub Pages API.
+permissions:
+  contents: read
+
 jobs:
   # Lint, format check, unit tests (with coverage gate), the production
   # build and the bundle size check. The built app (root base path) is
@@ -127,6 +133,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ci, e2e]
     if: github.ref == 'refs/heads/main'
+    # The official Pages actions authenticate via OIDC, so this job needs an
+    # id-token plus Pages write access on top of the workflow's read token.
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

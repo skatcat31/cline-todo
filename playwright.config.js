@@ -10,6 +10,15 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4173',
   },
+  // The same specs on all three browsers: the app's PWA/Notification and
+  // drag-and-drop code paths have engine‑specific quirks (the drag start
+  // even needs data set for Firefox – see TaskItem.jsx), so running them
+  // only on Chromium would hide regressions on the other engines.
+  projects: [
+    { name: 'chromium', use: {} },
+    { name: 'firefox', use: {} },
+    { name: 'webkit', use: {} },
+  ],
   webServer: {
     // Serve the production build from `dist/`. On CI, `dist/` is the
     // artifact the ci job just built (root base path), so the build is

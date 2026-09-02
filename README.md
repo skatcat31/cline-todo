@@ -190,8 +190,8 @@ src/
 
 ## Node version
 
-CI, Docker and the included `.nvmrc` all use Node 24 (LTS); the minimum
-supported version is 20.19 (see `engines` in `package.json`).
+CI, Docker and the included `.nvmrc` all use Node 24 (LTS), which is also
+the minimum supported version (see `engines` in `package.json`).
 
 ## License
 

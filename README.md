@@ -53,7 +53,7 @@ persisted in the browser's `localStorage`.
 | ----------- | -------------------------------------------------------------------------- |
 | UI          | React 19, MUI 9 (direct‑path imports), Emotion                             |
 | Build       | Vite 8, PWA via vite‑plugin‑pwa                                            |
-| Tests       | Vitest 4, Testing Library, jsdom (80% coverage thresholds), Playwright E2E |
+| Tests       | Vitest 4, Testing Library, jsdom (90% coverage thresholds), Playwright E2E |
 | Lint/format | ESLint 10 (flat config), Prettier                                          |
 | CI/CD       | GitHub Actions → GitHub Pages                                              |
 | Container   | Multi‑stage Docker build (Node → nginx)                                    |
@@ -81,7 +81,7 @@ npm run dev # start the dev server
 | `npm run preview`      | Preview the production build locally                                 |
 | `npm run icons`        | Regenerate the PWA icons from the favicon design (`public/icons/`)   |
 
-Coverage is enforced at 80% (statements, branches, functions and lines) in
+Coverage is enforced at 90% (statements, branches, functions and lines) in
 `vite.config.js`; run it with `npm test -- --coverage`; on CI the HTML
 report is published as a `coverage` artifact. End‑to‑end tests
 (`e2e/`) run the core user flows plus the PWA service worker / offline

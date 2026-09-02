@@ -120,16 +120,18 @@ export default defineConfig({
     // The Playwright specs in e2e/ are run with `playwright test`, not Vitest
     exclude: ['dist', 'node_modules', 'e2e/**'],
   },
-  // Vitest coverage configuration – enforce minimum 80% coverage for all metrics
+  // Vitest coverage configuration – enforce minimum 90% coverage for all metrics
   // This ensures CI pipelines will fail if coverage drops below the required threshold.
   coverage: {
     reporter: ['text', 'html'],
     // Enforce thresholds (percentage) – adjust as needed per project policy.
+    // Ratcheted up from 80%: the suite currently sits at ~93–98%, so the
+    // guard now requires real, not accidental, coverage of new code.
     thresholds: {
-      statements: 80,
-      branches: 80,
-      functions: 80,
-      lines: 80,
+      statements: 90,
+      branches: 90,
+      functions: 90,
+      lines: 90,
     },
   },
 });

@@ -93,8 +93,10 @@ jobs:
           name: dist
           path: dist
 
-      # Reuse the Chromium binary between runs (the system dependencies are
+      # Reuse the browser binaries between runs (the system dependencies are
       # still installed by --with-deps; only the browser download is cached).
+      # All three browsers: the specs run on chromium, firefox and webkit
+      # (see the projects in playwright.config.js).
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
@@ -102,7 +104,7 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps
 
       - name: Run end-to-end tests
         run: npx playwright test

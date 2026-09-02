@@ -12,6 +12,10 @@ export const pwaOptions = {
   registerType: 'autoUpdate',
   includeAssets: ['favicon.svg'],
   manifest: {
+    // Stable identity for the app across deployment URLs: the GitHub
+    // Pages address is canonical, so installs from other origins (for
+    // example the Docker deployment) read as the same application.
+    id: 'https://skatcat31.github.io/cline-todo/',
     name: 'To‑Do List',
     short_name: 'To‑Do',
     description: 'A Material Design To‑Do list built with React, Vite and MUI',

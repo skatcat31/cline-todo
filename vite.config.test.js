@@ -34,6 +34,15 @@ test('the manifest offers installable PNG icons (192/512 + maskable)', () => {
   );
 });
 
+test('the manifest declares a stable id for cross‑origin install identity', () => {
+  // The GitHub Pages address is the canonical one: installs from other
+  // origins (for example the Docker deployment) still identify the same
+  // application, and the id survives a future move of the site.
+  expect(pwaOptions.manifest.id).toBe(
+    'https://skatcat31.github.io/cline-todo/',
+  );
+});
+
 test('the service worker precaches the app shell for offline use', () => {
   const patterns = pwaOptions.workbox.globPatterns.join(',');
   // index.html must be precached: the navigation route serves it while

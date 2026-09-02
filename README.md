@@ -1,5 +1,9 @@
 # agentic-todo
 
+[![CI](https://github.com/skatcat31/cline-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/skatcat31/cline-todo/actions/workflows/ci.yml)
+[![Site](https://img.shields.io/badge/site-skatcat31.github.io-green)](https://skatcat31.github.io/cline-todo/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A To‑Do list application built with React 19, Vite and Material UI (MUI 9).
 Tasks live in multiple named lists, can have nested subtasks, and are all
 persisted in the browser's `localStorage`.

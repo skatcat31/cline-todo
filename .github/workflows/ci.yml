@@ -138,6 +138,13 @@ jobs:
     permissions:
       pages: write
       id-token: write
+    # deploy-pages additionally requires the job to run in an environment
+    # named github-pages (GitHub creates it when Pages is enabled for the
+    # repo; it fails with "Missing environment" without it). The url puts
+    # the deployed site into the environment's deployments list.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

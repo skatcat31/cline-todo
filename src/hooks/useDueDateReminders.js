@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { todayISO } from '../utils/dates.js';
 import { dueOnTasks, reminderNotification } from '../utils/reminders.js';
 
@@ -104,20 +104,39 @@ export function useDueDateReminders(tasks) {
     new Notification(payload.title, { body: payload.body });
   }, [permission, enabled, tasks]);
 
-  // Run the check on mount, on a slow interval, and whenever the tab
-  // becomes visible again.
+  // The latest check, kept in a ref so the interval and the visibility
+  // listener (installed once, below) can always call it without being
+  // reinstalled on every task change.
+  const announceRef = useRef(announce);
+  useEffect(() => {
+    announceRef.current = announce;
+  }, [announce]);
+
+  // Run the check whenever the inputs change (including on mount) – a new
+  // task, a permission grant or re‑enabling the feature must be picked up
+  // without waiting for the next interval tick.
   useEffect(() => {
     announce();
-    const interval = setInterval(announce, CHECK_INTERVAL_MS);
+  }, [announce]);
+
+  // The slow re‑check: background tabs throttle timers, so the interval
+  // alone is not reliable – the tab visibility listener (same effect)
+  // covers that. Both are installed once and call through the ref, so
+  // task changes do not tear the timer down and re‑arm it.
+  useEffect(() => {
+    const interval = setInterval(
+      () => announceRef.current(),
+      CHECK_INTERVAL_MS,
+    );
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') announce();
+      if (document.visibilityState === 'visible') announceRef.current();
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [announce]);
+  }, []);
 
   return { permission, enabled, requestPermission, toggleEnabled };
 }

@@ -92,10 +92,9 @@ should fail the build.
 
 ```
 src/
-  App.jsx              App shell: task list layout, due‑date sort,
-                       reminders, export/import, undo state and the
-                       import‑error snackbar; the import dialog, undo
-                       snackbar and persist warning live in components/
+  App.jsx              App shell: the layout and the user‑facing handlers
+                       (adding, deleting and moving tasks); the undo stack,
+                       drag‑and‑drop reorder and import flow live in hooks/
   main.jsx             Entry point (mounts App behind the ErrorBoundary)
   theme.js             createAppTheme(mode): light + dark Material themes
   hooks/
@@ -110,6 +109,15 @@ src/
     useDueDateReminders.js Due‑date reminders: owns the Notification
                        permission + on/off choice and announces the tasks
                        due today (once per day per task, via a per‑day log)
+    useTaskDragReorder.js The in‑progress drag‑and‑drop reorder: the
+                       dragged task + hover target state behind the drop
+                       indicator (reorderTask performs the move)
+    useTaskImport.js     The JSON import flow: file reading/validation and
+                       the replace/merge decision (the pending import, the
+                       error flag and the hidden input ref)
+    useUndoStack.js      The multi‑level undo stack for deletions (the
+                       entry cap, one‑by‑one undo and the snackbar close
+                       reasons: timeout / clickaway / explicit dismiss)
   components/
     TaskItem.jsx       One task row, its edit form, subtask progress and
                        subtask management (focusToken moves focus to its

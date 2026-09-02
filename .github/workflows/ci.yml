@@ -30,6 +30,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Security: fail on a known high- or critical-severity advisory in a
+      # direct or transitive dependency. Dependabot's weekly update PRs
+      # usually keep the tree clean; this is the safety net for a lapse.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
       - name: Lint
         run: npm run lint
 
@@ -62,6 +68,7 @@ jobs:
       - name: Check bundle size
         run: npm run size
 
+      # The e2e job consumes this artifact.
       - name: Upload built app
         uses: actions/upload-artifact@v7
         with:
@@ -93,8 +100,10 @@ jobs:
           name: dist
           path: dist
 
-      # Reuse the Chromium binary between runs (the system dependencies are
+      # Reuse the browser binaries between runs (the system dependencies are
       # still installed by --with-deps; only the browser download is cached).
+      # All three browsers: the specs run on chromium, firefox and webkit
+      # (see the projects in playwright.config.js).
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
@@ -102,17 +111,18 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps
 
       - name: Run end-to-end tests
         run: npx playwright test
 
-  # Publish the built app to GitHub Pages (main branch only). The gh-pages
-  # branch is the Pages source for this repository. The deploy job rebuilds
-  # from source (rather than reusing the ci job's artifact) because GitHub
-  # Pages needs the repository sub‑path base, while the ci job builds with
-  # the root base for the e2e job. Deployment is gated on the e2e job as
-  # well, so a broken user flow never reaches the live site.
+  # Publish the built app to GitHub Pages (main branch only), via the
+  # official Pages actions (the Pages source in Settings → Pages must be
+  # "GitHub Actions", not a branch). The deploy job rebuilds from source
+  # (rather than reusing the ci job's artifact) because GitHub Pages needs
+  # the repository sub‑path base, while the ci job builds with the root
+  # base for the e2e job. Deployment is gated on the e2e job as well, so
+  # a broken user flow never reaches the live site.
   deploy:
     runs-on: ubuntu-latest
     needs: [ci, e2e]
@@ -130,16 +140,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Enables the Pages environment for the runner (sets the Pages
+      # origin and other deploy‑pages inputs).
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       # GITHUB_REPOSITORY is set on the runner, so this builds with the
       # GitHub Pages sub‑path base (see vite.config.js).
       - name: Build for production
         run: npm run build
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4.1.0
+      # Hands the build output to the Pages deployer (instead of pushing a
+      # gh‑pages branch, which the previous peaceiris action did).
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
       # Announce where the site was deployed. Uses the default *.github.io
       # domain; update this if a custom domain is ever configured.

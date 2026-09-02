@@ -1,5 +1,9 @@
 # agentic-todo
 
+[![CI](https://github.com/skatcat31/cline-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/skatcat31/cline-todo/actions/workflows/ci.yml)
+[![Site](https://img.shields.io/badge/site-skatcat31.github.io-green)](https://skatcat31.github.io/cline-todo/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A To‑Do list application built with React 19, Vite and Material UI (MUI 9).
 Tasks live in multiple named lists, can have nested subtasks, and are all
 persisted in the browser's `localStorage`.
@@ -49,7 +53,7 @@ persisted in the browser's `localStorage`.
 | ----------- | -------------------------------------------------------------------------- |
 | UI          | React 19, MUI 9 (direct‑path imports), Emotion                             |
 | Build       | Vite 8, PWA via vite‑plugin‑pwa                                            |
-| Tests       | Vitest 4, Testing Library, jsdom (80% coverage thresholds), Playwright E2E |
+| Tests       | Vitest 4, Testing Library, jsdom (90% coverage thresholds), Playwright E2E |
 | Lint/format | ESLint 10 (flat config), Prettier                                          |
 | CI/CD       | GitHub Actions → GitHub Pages                                              |
 | Container   | Multi‑stage Docker build (Node → nginx)                                    |
@@ -77,7 +81,7 @@ npm run dev # start the dev server
 | `npm run preview`      | Preview the production build locally                                 |
 | `npm run icons`        | Regenerate the PWA icons from the favicon design (`public/icons/`)   |
 
-Coverage is enforced at 80% (statements, branches, functions and lines) in
+Coverage is enforced at 90% (statements, branches, functions and lines) in
 `vite.config.js`; run it with `npm test -- --coverage`; on CI the HTML
 report is published as a `coverage` artifact. End‑to‑end tests
 (`e2e/`) run the core user flows plus the PWA service worker / offline
@@ -92,10 +96,9 @@ should fail the build.
 
 ```
 src/
-  App.jsx              App shell: task list layout, due‑date sort,
-                       reminders, export/import, undo state and the
-                       import‑error snackbar; the import dialog, undo
-                       snackbar and persist warning live in components/
+  App.jsx              App shell: the layout and the user‑facing handlers
+                       (adding, deleting and moving tasks); the undo stack,
+                       drag‑and‑drop reorder and import flow live in hooks/
   main.jsx             Entry point (mounts App behind the ErrorBoundary)
   theme.js             createAppTheme(mode): light + dark Material themes
   hooks/
@@ -110,6 +113,15 @@ src/
     useDueDateReminders.js Due‑date reminders: owns the Notification
                        permission + on/off choice and announces the tasks
                        due today (once per day per task, via a per‑day log)
+    useTaskDragReorder.js The in‑progress drag‑and‑drop reorder: the
+                       dragged task + hover target state behind the drop
+                       indicator (reorderTask performs the move)
+    useTaskImport.js     The JSON import flow: file reading/validation and
+                       the replace/merge decision (the pending import, the
+                       error flag and the hidden input ref)
+    useUndoStack.js      The multi‑level undo stack for deletions (the
+                       entry cap, one‑by‑one undo and the snackbar close
+                       reasons: timeout / clickaway / explicit dismiss)
   components/
     TaskItem.jsx       One task row, its edit form, subtask progress and
                        subtask management (focusToken moves focus to its
@@ -178,8 +190,8 @@ src/
 
 ## Node version
 
-CI, Docker and the included `.nvmrc` all use Node 24 (LTS); the minimum
-supported version is 20.19 (see `engines` in `package.json`).
+CI, Docker and the included `.nvmrc` all use Node 24 (LTS), which is also
+the minimum supported version (see `engines` in `package.json`).
 
 ## License
 

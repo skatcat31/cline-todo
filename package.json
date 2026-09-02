@@ -2,9 +2,10 @@
   "name": "agentic-todo",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "A Material Design To‑Do list built with React, Vite and MUI",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=24"
   },
   "scripts": {
     "dev": "vite",

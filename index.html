@@ -7,8 +7,19 @@
       name="description"
       content="A Material Design To‑Do list built with React, Vite and MUI"
     />
+    <!-- The browser UI (address bar / tab strip) picks the theme color up
+         from these metas; the dark variant follows the OS preference. -->
     <meta name="theme-color" content="#1565c0" />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#121212"
+    />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <!-- The iOS home‑screen icon (180x180, see scripts/generate-icons.mjs);
+         referenced relative to the page, like the favicon, so it works at
+         the site root and under the GitHub Pages sub‑path alike. -->
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>To‑Do List</title>
   </head>
   <body>

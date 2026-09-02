@@ -28,13 +28,15 @@ import { SNACKBAR_SX } from './components/snackbarSx.js';
 import { useColorScheme } from './hooks/useColorScheme.js';
 import { useDueDateReminders } from './hooks/useDueDateReminders.js';
 import { usePersistentState } from './hooks/usePersistentState.js';
+import { useTaskDragReorder } from './hooks/useTaskDragReorder.js';
+import { useTaskImport } from './hooks/useTaskImport.js';
 import { useTasks } from './hooks/useTasks.js';
+import { useUndoStack } from './hooks/useUndoStack.js';
 import { FILTERS } from './utils/filters.js';
-import { downloadTasks, parseTasksFile } from './utils/taskFile.js';
+import { downloadTasks } from './utils/taskFile.js';
 import {
   completedItems,
   indexOfTask,
-  mergeTasks,
   sortTasksByDue,
   tasksMatching,
   taskCounts,
@@ -50,11 +52,6 @@ const FILTER_KEY = 'todo-filter';
 // values are "none" – the manual list order – and "due" – earliest due
 // date first; anything else falls back to "none").
 const SORT_KEY = 'todo-sort';
-
-// How many deletion actions the undo snackbar remembers (multi‑level
-// undo): new actions push onto the end of the stack and the oldest one is
-// dropped once the limit is reached.
-const UNDO_LIMIT = 5;
 
 // A simple To Do application allowing users to add tasks with a title and
 // description. Task state, mutations and persistence live in the `useTasks`
@@ -117,36 +114,16 @@ function App() {
   // The current search query: a transient view filter (title, description
   // or subtask title), unlike the status filter it is not persisted.
   const [search, setSearch] = useState('');
-  // Stack of undoable actions (oldest first): each entry holds the removed
-  // tasks (with their original positions) and its snackbar description.
-  // Single deletes and "clear completed" push an entry; "Undo" pops the
-  // most recent one, so up to UNDO_LIMIT actions can be undone in
-  // sequence. An empty stack means nothing to undo.
-  const [undoStack, setUndoStack] = useState([]);
-  // Monotonically increasing stamp for stack entries: the snackbar is
-  // keyed on the latest stamp so each new entry restarts its auto‑hide
-  // timer.
-  const undoSeq = useRef(0);
-
-  // Push an undoable action onto the stack, dropping the oldest entry
-  // once the limit is reached. `listId` remembers which list the tasks
-  // came from, so undo can restore them there even if the user switched
-  // lists in the meantime.
-  const pushUndo = (items, listId) => {
-    undoSeq.current += 1;
-    const stamp = undoSeq.current;
-    setUndoStack((prev) => {
-      const next = [...prev, { items, listId, stamp }];
-      return next.length > UNDO_LIMIT
-        ? next.slice(next.length - UNDO_LIMIT)
-        : next;
-    });
-  };
-  // A valid import waiting for the user’s decision (replace or merge);
-  // `null` means the confirmation dialog is closed.
-  const [pendingImport, setPendingImport] = useState(null);
-  // Whether the last import attempt failed (bad file contents).
-  const [importError, setImportError] = useState(false);
+  // Multi‑level undo for deletions: the hook owns the stack, the entry
+  // cap and how a snackbar dismissal is interpreted; the app decides what
+  // is undoable (handleDeleteTask / handleClearCompleted) and hands the
+  // re‑insertion to useTasks.
+  const {
+    stack: undoStack,
+    push: pushUndo,
+    undo: handleUndo,
+    close: closeUndoSnackbar,
+  } = useUndoStack(insertTasks);
   // Ref to the new‑task title field so focus can fall back to it when the
   // whole list becomes empty after a delete.
   const titleInputRef = useRef(null);
@@ -155,8 +132,20 @@ function App() {
   // re-triggers the focus effect for repeat deletes; null means
   // "no focus request".
   const [focusTask, setFocusTask] = useState(null);
-  // Hidden file input used by the "Import tasks" button.
-  const fileInputRef = useRef(null);
+  // The JSON import flow (file reading, validation, the replace/merge
+  // decision): the hook owns the pending import, the error flag and the
+  // hidden file input; replaceTasks performs the mutation.
+  const {
+    pendingImport,
+    error: importError,
+    clearError: clearImportError,
+    fileInputRef,
+    openPicker: handleImportClick,
+    handleFileChange: handleImportChange,
+    cancel: closeImportDialog,
+    replace: handleImportReplace,
+    merge: handleImportMerge,
+  } = useTaskImport(tasks, replaceTasks);
   // Color scheme: "light", "system" (follow the OS) or "dark"; the hook
   // persists the choice, tracks the OS preference live in "system" mode and
   // hands back the concrete MUI theme for the effective scheme.
@@ -193,16 +182,6 @@ function App() {
     }
   };
 
-  // Re‑insert the most recently removed tasks (the newest stack entry,
-  // the last one) and keep the earlier entries, so several deletions can
-  // be undone in sequence (most recent one first).
-  const handleUndo = () => {
-    if (undoStack.length === 0) return;
-    const latest = undoStack[undoStack.length - 1];
-    insertTasks(latest.items, latest.listId);
-    setUndoStack(undoStack.slice(0, -1));
-  };
-
   // Move a task one row up/down within the *currently visible* list (the
   // filter may hide other tasks, so the neighbour is computed on the shown
   // list, not the full list – the reducer swaps the two full-list entries).
@@ -215,57 +194,16 @@ function App() {
     }
   };
 
-  // The in‑progress drag‑and‑drop reorder (HTML5 drag events on the drag
-  // handle): the dragged task's id plus the row currently hovered and
-  // which half of it (so the list can paint a drop indicator). `null`
-  // means no drag in progress.
-  const [dragTask, setDragTask] = useState(null);
-
-  // A drag started on a task's handle.
-  const handleDragStartTask = (id) =>
-    setDragTask({ id, overId: null, after: false });
-
-  // The pointer is over another row: update the drop indicator, but skip
-  // the re‑render when nothing (hovered row / half) actually changed.
-  const handleDragOverTask = (overId, after) => {
-    setDragTask((prev) => {
-      if (!prev || prev.id === overId) return prev;
-      if (prev.overId === overId && prev.after === after) return prev;
-      return { ...prev, overId, after };
-    });
-  };
-
-  // A drop on a row: move the dragged task before/after that row, then
-  // end the drag.
-  const handleDropTask = (overId, after) => {
-    if (dragTask && dragTask.id !== overId) {
-      reorderTask(dragTask.id, overId, after);
-    }
-    setDragTask(null);
-  };
-
-  // The drag ended (dropped on a row, or outside the list): clear the
-  // indicator either way.
-  const handleDragEndTask = () => setDragTask(null);
-
-  // Handle the undo snackbar closing. The close reasons have different
-  // intents:
-  //  - "timeout" (the auto‑hide expired): drop only the newest entry, so
-  //    the snackbar re‑opens for the previous undo (the changing key
-  //    restarts the auto‑hide timer for it) instead of discarding the
-  //    whole stack after a single 6‑second window;
-  //  - "clickaway" (a click anywhere else in the app): keep the stack –
-  //    the user is just working on (or deleting) more tasks;
-  //  - anything else (the close button, the Escape key): an explicit
-  //    dismiss – clear the whole stack.
-  const closeUndoSnackbar = (event, reason) => {
-    if (reason === 'timeout') {
-      setUndoStack((prev) => prev.slice(0, -1));
-      return;
-    }
-    if (reason === 'clickaway') return;
-    setUndoStack([]);
-  };
+  // The in‑progress drag‑and‑drop reorder: the hook owns the dragged
+  // task / hover state (which drives the drop indicator); reorderTask
+  // performs the actual move.
+  const {
+    dragTask,
+    start: handleDragStartTask,
+    over: handleDragOverTask,
+    drop: handleDropTask,
+    end: handleDragEndTask,
+  } = useTaskDragReorder(reorderTask);
 
   // Remove every completed task and remember it (with its position) so
   // the snackbar can offer an undo, like for single deletes.
@@ -273,55 +211,6 @@ function App() {
     const removed = completedItems(tasks);
     clearCompleted();
     if (removed.length > 0) pushUndo(removed, activeListId);
-  };
-
-  // Open the hidden file picker for importing a task list.
-  const handleImportClick = () => fileInputRef.current?.click();
-
-  // Read the chosen file, validate it, and replace the list when valid.
-  // The input value is reset so the same file can be imported again.
-  const handleImportChange = async (e) => {
-    const input = e.target;
-    const file = input.files && input.files[0];
-    input.value = '';
-    if (!file) return;
-    let parsed;
-    try {
-      parsed = parseTasksFile(await file.text());
-    } catch {
-      parsed = null;
-    }
-    if (parsed === null) {
-      setImportError(true);
-      return;
-    }
-    setImportError(false);
-    // An empty list can be replaced without asking; otherwise the user
-    // decides between replacing the list and merging the import into it,
-    // so importing never destroys existing tasks silently.
-    if (tasks.length === 0) {
-      replaceTasks(parsed);
-    } else {
-      setPendingImport(parsed);
-    }
-  };
-
-  const closeImportDialog = () => setPendingImport(null);
-
-  // Replace the whole list with the imported tasks.
-  const handleImportReplace = () => {
-    if (!pendingImport) return;
-    replaceTasks(pendingImport);
-    setPendingImport(null);
-  };
-
-  // Keep the current tasks and append the imported ones that do not
-  // already exist (matched by id), so merging never duplicates or
-  // overwrites.
-  const handleImportMerge = () => {
-    if (!pendingImport) return;
-    replaceTasks(mergeTasks(tasks, pendingImport));
-    setPendingImport(null);
   };
 
   // The task list as shown by the search query and the active filter, plus
@@ -516,7 +405,7 @@ function App() {
         <Snackbar
           open={importError}
           autoHideDuration={6000}
-          onClose={() => setImportError(false)}
+          onClose={clearImportError}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           sx={{ mb: 2, ...SNACKBAR_SX }}
         >

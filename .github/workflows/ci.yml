@@ -177,7 +177,7 @@ jobs:
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
       # Announce where the site was deployed. Uses the default *.github.io
       # domain; update this if a custom domain is ever configured.

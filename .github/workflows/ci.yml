@@ -111,7 +111,7 @@ jobs:
       # All three browsers: the specs run on chromium, firefox and webkit
       # (see the projects in playwright.config.js).
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}

@@ -161,7 +161,7 @@ jobs:
       # Enables the Pages environment for the runner (sets the Pages
       # origin and other deploy‑pages inputs).
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       # GITHUB_REPOSITORY is set on the runner, so this builds with the
       # GitHub Pages sub‑path base (see vite.config.js).

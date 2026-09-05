@@ -171,7 +171,7 @@ jobs:
       # Hands the build output to the Pages deployer (instead of pushing a
       # gh‑pages branch, which the previous peaceiris action did).
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
